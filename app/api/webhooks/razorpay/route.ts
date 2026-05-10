@@ -4,15 +4,11 @@ import { createServiceClient, type Database } from '@/lib/supabase'
 import { generateDisputeLetter } from '@/lib/generation'
 import { generatePdf } from '@/lib/pdf'
 import { sendDisputeLetterEmail } from '@/lib/email'
-import type { ApiError } from '@/types/api'
-import { rateLimit } from '@/lib/rate-limit'
 
 type CaseRow = Database['public']['Tables']['cases']['Row']
 type CaseUpdate = Database['public']['Tables']['cases']['Update']
 type SupabaseClient = ReturnType<typeof createServiceClient>
 
-// Type cast required: supabase-js generic resolution issue with custom Database types
-// (same pattern as app/api/generate/route.ts)
 type UpdateQuery = {
   eq: (column: string, value: string) => Promise<{ error: { message: string } | null }>
 }
@@ -20,68 +16,89 @@ function typedUpdate(supabase: SupabaseClient, values: CaseUpdate): UpdateQuery 
   return (supabase.from('cases').update as unknown as (v: CaseUpdate) => UpdateQuery)(values)
 }
 
-interface VerifySuccessResponse {
-  success: true
-  caseId: string
+interface RazorpayWebhookPayload {
+  event: string
+  payload: {
+    payment: {
+      entity: {
+        id: string
+        order_id: string
+        status: string
+      }
+    }
+  }
 }
 
-export async function POST(
-  request: NextRequest,
-): Promise<NextResponse<VerifySuccessResponse | ApiError>> {
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
-  const { success } = await rateLimit(`payment-verify:${ip}`, { maxRequests: 5, windowMs: 60_000 })
-  if (!success) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait a minute before trying again.' },
-      { status: 429 }
-    )
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET
+  if (!webhookSecret) {
+    console.error('[webhook/razorpay] RAZORPAY_WEBHOOK_SECRET not configured')
+    return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 })
   }
 
-  let body: Record<string, string>
-  try {
-    body = (await request.json()) as Record<string, string>
-  } catch {
-    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  const signature = request.headers.get('x-razorpay-signature')
+  if (!signature) {
+    return NextResponse.json({ error: 'Missing signature' }, { status: 400 })
   }
 
-  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = body
+  const rawBody = await request.text()
 
-  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-    return NextResponse.json({ error: 'Missing payment fields' }, { status: 400 })
-  }
-
-  // Verify HMAC-SHA256 signature
-  const expectedSignature = crypto
-    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET!)
-    .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+  const expectedSig = crypto
+    .createHmac('sha256', webhookSecret)
+    .update(rawBody)
     .digest('hex')
 
-  if (expectedSignature !== razorpay_signature) {
-    return NextResponse.json({ error: 'Payment verification failed' }, { status: 400 })
+  const sigBuf = Buffer.from(signature, 'hex')
+  const expectedBuf = Buffer.from(expectedSig, 'hex')
+
+  if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) {
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
   }
+
+  let payload: RazorpayWebhookPayload
+  try {
+    payload = JSON.parse(rawBody) as RazorpayWebhookPayload
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+
+  if (payload.event !== 'payment.captured') {
+    return NextResponse.json({ received: true })
+  }
+
+  const orderId = payload.payload.payment.entity.order_id
+  const paymentId = payload.payload.payment.entity.id
 
   const supabase = createServiceClient()
 
   const { data: rawCase, error: caseError } = await supabase
     .from('cases')
     .select('*')
-    .eq('razorpay_order_id', razorpay_order_id)
+    .eq('razorpay_order_id', orderId)
     .single()
 
   if (caseError || !rawCase) {
-    return NextResponse.json({ error: 'Case not found for this order' }, { status: 404 })
+    console.error('[webhook/razorpay] Case not found for order', orderId)
+    return NextResponse.json({ error: 'Case not found' }, { status: 404 })
   }
 
   const caseRow = rawCase as CaseRow
 
+  // Idempotency: skip if already processed
+  if (
+    caseRow.status === 'paid' ||
+    caseRow.status === 'generated' ||
+    caseRow.status === 'delivered'
+  ) {
+    return NextResponse.json({ received: true })
+  }
+
   await typedUpdate(supabase, {
     status: 'paid',
-    razorpay_payment_id,
+    razorpay_payment_id: paymentId,
     paid_at: new Date().toISOString(),
   }).eq('id', caseRow.id)
 
-  // Fire-and-forget: generate + deliver in background (client polls /api/download/[caseId])
-  // 120s timeout: generous for Sonnet generation; prevents case staying 'paid' forever if hung
   const DELIVERY_TIMEOUT_MS = 120_000
   const timeoutPromise = new Promise<never>((_, reject) =>
     setTimeout(
@@ -91,14 +108,14 @@ export async function POST(
   )
   Promise.race([generateAndDeliver(caseRow.id, supabase), timeoutPromise]).catch((err: unknown) =>
     console.error(
-      '[payment/verify] Delivery error for',
+      '[webhook/razorpay] Delivery error for',
       caseRow.id,
       ':',
       err instanceof Error ? err.message : String(err),
     ),
   )
 
-  return NextResponse.json({ success: true, caseId: caseRow.id })
+  return NextResponse.json({ received: true })
 }
 
 async function generateAndDeliver(caseId: string, supabase: SupabaseClient): Promise<void> {

@@ -170,7 +170,7 @@ export default function PayPage() {
         {/* What you get */}
         <div className="rounded-xl border border-rule bg-cream px-6 py-5 mb-6">
           <p className="font-mono text-[10px] tracking-widest text-ink/40 uppercase mb-4">
-            What's included
+            What&apos;s included
           </p>
           <ul className="flex flex-col gap-3">
             {WHAT_YOU_GET.map((item, i) => (

@@ -137,7 +137,7 @@ export default function DownloadPage() {
             Your dispute letter is ready.
           </h1>
           <p className="mt-3 font-sans text-sm text-ink/60">
-            It's been sent to your email too. Download it below to get started.
+            It&apos;s been sent to your email too. Download it below to get started.
           </p>
         </div>
 

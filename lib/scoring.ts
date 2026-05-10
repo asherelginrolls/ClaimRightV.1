@@ -12,7 +12,6 @@ export function calculateFightabilityScore(
   facts: ExtractedFacts,
   retrieval: RetrievalResult
 ): { score: FightabilityScore; reasons: FightabilityReason[] } {
-  const reasons: FightabilityReason[] = []
   const { chunks, topScore } = retrieval
   const category = facts.rejection_reason_category
 

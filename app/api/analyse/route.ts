@@ -12,9 +12,9 @@ import { rateLimit } from '@/lib/rate-limit'
 
 type CaseRow = Database['public']['Tables']['cases']['Row']
 type CaseUpdate = Database['public']['Tables']['cases']['Update']
+type CaseDocRow = Database['public']['Tables']['case_documents']['Row']
 
 // Type cast needed: supabase-js generic resolution issue with custom Database types
-// (same pattern as lib/retrieval.ts rpc() call)
 type UpdateQuery = {
   eq: (column: string, value: string) => Promise<{ error: { message: string } | null }>
 }
@@ -25,6 +25,90 @@ function typedUpdate(
   return (
     supabase.from('cases').update as unknown as (v: CaseUpdate) => UpdateQuery
   )(values)
+}
+
+const DOC_TYPE_HEADERS: Record<string, string> = {
+  rejection_letter: 'Rejection Letter',
+  policy_document: 'Policy Document',
+  hospital_bills: 'Hospital Bills',
+  discharge_summary: 'Discharge Summary',
+  prior_correspondence: 'Prior Correspondence',
+  other: 'Other Document',
+}
+
+async function buildCombinedDocumentText(
+  supabase: ReturnType<typeof createServiceClient>,
+  caseId: string,
+  fallbackDocumentPath: string | null
+): Promise<string> {
+  // Try fetching case_documents rows first
+  const { data: docs } = await (
+    supabase
+      .from('case_documents')
+      .select('*')
+      .eq('case_id', caseId)
+      .order('uploaded_at', { ascending: true }) as unknown as Promise<{
+        data: CaseDocRow[] | null
+      }>
+  )
+
+  if (docs && docs.length > 0) {
+    // OCR each document in parallel, store ocr_text back to DB
+    const ocrResults = await Promise.all(
+      docs.map(async (doc) => {
+        const { data: fileData, error: fileError } = await supabase.storage
+          .from('documents')
+          .download(doc.storage_path)
+
+        if (fileError || !fileData) {
+          console.warn(`[analyse] Could not download ${doc.doc_type} (${doc.storage_path})`)
+          return { doc, text: '' }
+        }
+
+        const buffer = Buffer.from(await fileData.arrayBuffer())
+        const ext = doc.storage_path.split('.').pop()?.toLowerCase()
+        const mimeType =
+          ext === 'pdf' ? 'application/pdf' : ext === 'png' ? 'image/png' : 'image/jpeg'
+
+        const text = await extractTextFromDocument(buffer, mimeType)
+
+        // Store ocr_text in case_documents for future reference
+        await (
+          supabase.from('case_documents').update as unknown as (
+            values: { ocr_text: string | null }
+          ) => { eq: (col: string, val: string) => Promise<{ error: unknown }> }
+        )({ ocr_text: text }).eq('id', doc.id)
+
+        return { doc, text }
+      })
+    )
+
+    // Concatenate with doc-type headers; skip empty results
+    const sections = ocrResults
+      .filter(({ text }) => text.trim().length > 0)
+      .map(({ doc, text }) => {
+        const header = DOC_TYPE_HEADERS[doc.doc_type] ?? 'Document'
+        return `### ${header}\n${text}`
+      })
+
+    return sections.join('\n\n')
+  }
+
+  // Backwards compat: no case_documents rows — fall back to cases.document_path
+  if (!fallbackDocumentPath) return ''
+
+  const { data: fileData, error: fileError } = await supabase.storage
+    .from('documents')
+    .download(fallbackDocumentPath)
+
+  if (fileError || !fileData) return ''
+
+  const buffer = Buffer.from(await fileData.arrayBuffer())
+  const ext = fallbackDocumentPath.split('.').pop()?.toLowerCase()
+  const mimeType =
+    ext === 'pdf' ? 'application/pdf' : ext === 'png' ? 'image/png' : 'image/jpeg'
+
+  return extractTextFromDocument(buffer, mimeType)
 }
 
 export async function GET(
@@ -73,26 +157,12 @@ export async function GET(
       })
     }
 
-    if (!caseRow.document_path) {
-      return NextResponse.json({ error: 'No document found for this case.' }, { status: 400 })
-    }
-
-    // Download document from storage
-    const { data: fileData, error: fileError } = await supabase.storage
-      .from('documents')
-      .download(caseRow.document_path)
-
-    if (fileError || !fileData) {
-      throw new Error('Could not retrieve uploaded document from storage.')
-    }
-
-    const fileBuffer = Buffer.from(await fileData.arrayBuffer())
-    const ext = caseRow.document_path.split('.').pop()?.toLowerCase()
-    const mimeType =
-      ext === 'pdf' ? 'application/pdf' : ext === 'png' ? 'image/png' : 'image/jpeg'
-
-    // OCR
-    const documentText = await extractTextFromDocument(fileBuffer, mimeType)
+    // OCR all documents (multi-doc aware, backwards compatible)
+    const documentText = await buildCombinedDocumentText(
+      supabase,
+      caseId,
+      caseRow.document_path
+    )
 
     if (!documentText || documentText.trim().length < 50) {
       await typedUpdate(supabase, {

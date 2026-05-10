@@ -92,6 +92,51 @@ export type Database = {
           paid_at?: string | null
         }
       }
+      case_documents: {
+        Relationships: []
+        Row: {
+          id: string
+          case_id: string
+          doc_type:
+            | 'rejection_letter'
+            | 'policy_document'
+            | 'hospital_bills'
+            | 'discharge_summary'
+            | 'prior_correspondence'
+            | 'other'
+          storage_path: string
+          ocr_text: string | null
+          uploaded_at: string
+        }
+        Insert: {
+          id?: string
+          case_id: string
+          doc_type:
+            | 'rejection_letter'
+            | 'policy_document'
+            | 'hospital_bills'
+            | 'discharge_summary'
+            | 'prior_correspondence'
+            | 'other'
+          storage_path: string
+          ocr_text?: string | null
+          uploaded_at?: string
+        }
+        Update: {
+          id?: string
+          case_id?: string
+          doc_type?:
+            | 'rejection_letter'
+            | 'policy_document'
+            | 'hospital_bills'
+            | 'discharge_summary'
+            | 'prior_correspondence'
+            | 'other'
+          storage_path?: string
+          ocr_text?: string | null
+          uploaded_at?: string
+        }
+      }
       kb_chunks: {
         Relationships: []
         Row: {

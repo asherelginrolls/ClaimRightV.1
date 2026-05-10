@@ -1,5 +1,22 @@
 export type CaseStatus = 'uploaded' | 'analysed' | 'paid' | 'generated' | 'delivered'
 
+export type DocType =
+  | 'rejection_letter'
+  | 'policy_document'
+  | 'hospital_bills'
+  | 'discharge_summary'
+  | 'prior_correspondence'
+  | 'other'
+
+export interface CaseDocument {
+  id: string
+  case_id: string
+  doc_type: DocType
+  storage_path: string
+  ocr_text: string | null
+  uploaded_at: string
+}
+
 export type RejectionCategory =
   | 'pre_existing_condition'
   | 'policy_exclusion'

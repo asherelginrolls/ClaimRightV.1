@@ -1,0 +1,1770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ClaimRight — Fight your rejected health insurance claim.</title>
+<meta name="description" content="ClaimRight turns a rejection letter into a filed-ready dispute pack in five minutes. Backed by IRDAI regulations and real ombudsman rulings. Built for India's health policyholders." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..900,0..100&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    /* Warm editorial base */
+    --bg: #F5F1E8;
+    --bg-soft: #EFEAE0;
+    --bg-card: #FBF8F1;
+    --ink: #14181A;
+    --ink-2: #2A2F33;
+    --ink-3: #565B60;
+    --ink-4: #8A8F94;
+    --rule: #D9D2C3;
+    --rule-soft: #E4DECE;
+
+    /* Dark section */
+    --dark: #0E1411;
+    --dark-2: #141C18;
+    --dark-3: #1C2620;
+    --dark-ink: #F2EEE3;
+    --dark-ink-2: #BEB8A8;
+    --dark-ink-3: #7C7A6E;
+    --dark-rule: #26302A;
+
+    /* Accents */
+    --forest: #1F3B2A;
+    --forest-bright: #2C5A3F;
+    --gold: #B8915A;
+    --gold-bright: #D4A467;
+    --ember: #C86941;
+
+    /* Type */
+    --serif: 'Fraunces', ui-serif, Georgia, serif;
+    --sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+
+    /* Layout */
+    --maxw: 1240px;
+    --pad-x: clamp(20px, 4vw, 56px);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.55;
+    overflow-x: hidden;
+  }
+
+  /* Subtle grain */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 100;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    mix-blend-mode: multiply;
+  }
+
+  ::selection { background: var(--forest); color: var(--bg-card); }
+
+  /* ---- Nav ---- */
+  nav.top {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    backdrop-filter: saturate(1.1) blur(12px);
+    background: rgba(245, 241, 232, 0.82);
+    border-bottom: 1px solid transparent;
+    transition: border-color 200ms ease, background 200ms ease;
+  }
+  nav.top.scrolled { border-bottom-color: var(--rule); }
+  .nav-inner {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 18px var(--pad-x);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+  }
+  .logo {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 22px;
+    font-variation-settings: "SOFT" 50, "opsz" 36;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo-mark {
+    width: 22px; height: 22px;
+    border-radius: 6px;
+    background: var(--forest);
+    display: inline-grid; place-items: center;
+    color: var(--bg-card);
+    font-family: var(--serif);
+    font-weight: 700;
+    font-size: 13px;
+    font-variation-settings: "opsz" 14;
+  }
+  .nav-right { display: flex; align-items: center; gap: 22px; }
+  .nav-link { color: var(--ink-3); text-decoration: none; font-size: 14px; font-weight: 500; }
+  .nav-link:hover { color: var(--ink); }
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 11px 18px;
+    border-radius: 999px;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    cursor: pointer;
+    border: 1px solid transparent;
+    text-decoration: none;
+    transition: transform 120ms ease, background 160ms ease, color 160ms ease, border-color 160ms ease;
+    white-space: nowrap;
+  }
+  .btn-primary { background: var(--ink); color: var(--bg-card); }
+  .btn-primary:hover { background: var(--forest); }
+  .btn-ghost { background: transparent; color: var(--ink); border-color: var(--rule); }
+  .btn-ghost:hover { border-color: var(--ink); }
+  .btn-lg { padding: 15px 24px; font-size: 15px; }
+  .btn .arr { transition: transform 200ms ease; }
+  .btn:hover .arr { transform: translateX(3px); }
+
+  /* ---- Hero ---- */
+  .hero {
+    padding: clamp(70px, 12vw, 140px) var(--pad-x) clamp(70px, 11vw, 120px);
+    max-width: var(--maxw);
+    margin: 0 auto;
+    position: relative;
+  }
+  .kicker {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .kicker::before {
+    content: '';
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--ember);
+    box-shadow: 0 0 0 4px rgba(200,105,65,0.15);
+  }
+  .hero h1 {
+    font-family: var(--serif);
+    font-variation-settings: "opsz" 144, "SOFT" 30;
+    font-weight: 420;
+    font-size: clamp(40px, 6.8vw, 88px);
+    line-height: 0.98;
+    letter-spacing: -0.028em;
+    color: var(--ink);
+    margin: 22px 0 28px;
+    max-width: 14ch;
+  }
+  .hero h1 em {
+    font-style: italic;
+    font-variation-settings: "opsz" 144, "SOFT" 80;
+    color: var(--forest);
+    font-weight: 400;
+  }
+  .hero-sub {
+    font-size: clamp(17px, 1.5vw, 20px);
+    line-height: 1.5;
+    color: var(--ink-2);
+    max-width: 54ch;
+    margin: 0 0 36px;
+  }
+  .hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 20px; }
+  .hero-meta { color: var(--ink-3); font-size: 13px; }
+  .hero-meta b { color: var(--ink); font-weight: 600; }
+
+  /* Hero visual column */
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 1.35fr 1fr;
+    gap: clamp(40px, 6vw, 80px);
+    align-items: end;
+  }
+  .hero-visual {
+    position: relative;
+    padding-top: 30px;
+  }
+  .hero-card {
+    background: var(--bg-card);
+    border: 1px solid var(--rule);
+    border-radius: 14px;
+    padding: 22px;
+    box-shadow: 0 20px 50px -30px rgba(20,24,26,0.25);
+    position: relative;
+    font-family: var(--serif);
+    font-variation-settings: "opsz" 14;
+    transform: rotate(-1.2deg);
+    transition: transform 500ms cubic-bezier(.2,.8,.2,1);
+  }
+  .hero-card:hover { transform: rotate(0); }
+  .hero-card::before {
+    content: 'REJECTED';
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    color: var(--ember);
+    border: 1px solid var(--ember);
+    border-radius: 4px;
+    padding: 3px 7px;
+    font-weight: 500;
+  }
+  .hero-card .lbl {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--ink-4);
+    margin-bottom: 8px;
+  }
+  .hero-card .lh {
+    font-family: var(--serif);
+    font-size: 14px;
+    color: var(--ink-2);
+    line-height: 1.5;
+    margin-bottom: 12px;
+  }
+  .hero-card .lh b { color: var(--ink); font-weight: 600; }
+  .hero-card .lh .strike { text-decoration: line-through; color: var(--ink-4); }
+  .arrow-to {
+    display: flex; align-items: center; justify-content: center;
+    margin: 14px auto;
+    color: var(--forest);
+  }
+  .hero-card-2 {
+    background: var(--forest);
+    color: var(--bg-card);
+    border: 1px solid var(--forest);
+    border-radius: 14px;
+    padding: 22px;
+    position: relative;
+    transform: rotate(1deg) translateY(-10px);
+    box-shadow: 0 20px 50px -30px rgba(31,59,42,0.5);
+    font-family: var(--sans);
+    transition: transform 500ms cubic-bezier(.2,.8,.2,1);
+  }
+  .hero-card-2:hover { transform: rotate(0) translateY(-10px); }
+  .hero-card-2::before {
+    content: 'FILED · DISPUTE #2847';
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    color: var(--gold-bright);
+    border: 1px solid rgba(212,164,103,0.5);
+    border-radius: 4px;
+    padding: 3px 7px;
+  }
+  .hero-card-2 .lbl { color: var(--dark-ink-3); }
+  .hero-card-2 .lh { color: var(--dark-ink); }
+  .hero-card-2 .lh .cite {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    background: rgba(212,164,103,0.14);
+    color: var(--gold-bright);
+    padding: 2px 6px;
+    border-radius: 3px;
+  }
+
+  /* ---- Marquee stats strip ---- */
+  .strip {
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    background: var(--bg-soft);
+    padding: clamp(36px, 5vw, 56px) var(--pad-x);
+  }
+  .strip-inner {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: clamp(28px, 4vw, 56px);
+    position: relative;
+  }
+  .strip-inner::before, .strip-inner::after {
+    content: '';
+    position: absolute;
+    top: 6px; bottom: 6px;
+    width: 1px;
+    background: var(--rule);
+  }
+  .strip-inner::before { left: calc(33.333% - 0px); }
+  .strip-inner::after { right: calc(33.333% - 0px); }
+
+  .stat-num {
+    font-family: var(--serif);
+    font-variation-settings: "opsz" 144, "SOFT" 30;
+    font-weight: 400;
+    font-size: clamp(42px, 6vw, 72px);
+    line-height: 0.98;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    display: block;
+    margin-bottom: 10px;
+  }
+  .stat-num .unit {
+    font-size: 0.48em;
+    color: var(--ink-3);
+    font-variation-settings: "opsz" 24;
+    margin-left: 4px;
+  }
+  .stat-lbl {
+    font-size: 14px;
+    color: var(--ink-3);
+    line-height: 1.5;
+    max-width: 38ch;
+  }
+  .stat-lbl b { color: var(--ink-2); font-weight: 600; }
+
+  /* ---- Section wrapper ---- */
+  section.pad { padding: clamp(80px, 10vw, 140px) var(--pad-x); }
+  .wrap { max-width: var(--maxw); margin: 0 auto; }
+
+  .sec-head {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: clamp(32px, 5vw, 80px);
+    margin-bottom: clamp(44px, 6vw, 80px);
+    align-items: end;
+  }
+  .sec-head .kicker { margin-bottom: 16px; }
+  .sec-head h2 {
+    font-family: var(--serif);
+    font-variation-settings: "opsz" 144, "SOFT" 30;
+    font-weight: 400;
+    font-size: clamp(34px, 4.8vw, 62px);
+    line-height: 1;
+    letter-spacing: -0.024em;
+    color: var(--ink);
+    margin: 0;
+  }
+  .sec-head h2 em { font-style: italic; color: var(--forest); font-variation-settings: "opsz" 144, "SOFT" 80; }
+  .sec-head p {
+    font-size: 17px;
+    color: var(--ink-3);
+    line-height: 1.55;
+    margin: 0;
+    max-width: 52ch;
+  }
+
+  /* ---- Fightability Section (dark) ---- */
+  .fight-sec {
+    background: var(--dark);
+    color: var(--dark-ink);
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    position: relative;
+    overflow: hidden;
+  }
+  .fight-sec::before {
+    content: '';
+    position: absolute;
+    top: -200px; right: -200px;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(184,145,90,0.12), transparent 65%);
+    pointer-events: none;
+  }
+  .fight-sec .kicker { color: var(--gold-bright); }
+  .fight-sec .kicker::before { background: var(--gold); box-shadow: 0 0 0 4px rgba(184,145,90,0.15); }
+  .fight-sec h2 { color: var(--dark-ink); }
+  .fight-sec h2 em { color: var(--gold-bright); }
+  .fight-sec p { color: var(--dark-ink-2); }
+
+  .fight-card {
+    background: var(--dark-2);
+    border: 1px solid var(--dark-rule);
+    border-radius: 20px;
+    padding: clamp(28px, 4vw, 48px);
+    display: grid;
+    grid-template-columns: 1fr 0.95fr;
+    gap: clamp(32px, 5vw, 72px);
+    align-items: start;
+  }
+
+  .fight-inputs { display: flex; flex-direction: column; gap: 22px; }
+  .field { position: relative; }
+  .field-lbl {
+    display: block;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--dark-ink-3);
+    margin-bottom: 9px;
+  }
+
+  /* Custom dropdown (readable on dark bg, no browser option-white problem) */
+  .dd {
+    position: relative;
+  }
+  .dd-btn {
+    width: 100%;
+    background: var(--dark-3);
+    border: 1px solid var(--dark-rule);
+    border-radius: 10px;
+    color: var(--dark-ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 500;
+    padding: 14px 44px 14px 16px;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 150ms ease, background 150ms ease;
+  }
+  .dd-btn:hover { border-color: var(--gold); }
+  .dd-btn:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(184,145,90,0.18); }
+  .dd-chev {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 10px; height: 10px;
+    pointer-events: none;
+    color: var(--dark-ink-3);
+    transition: transform 180ms ease;
+  }
+  .dd.open .dd-chev { transform: translateY(-50%) rotate(180deg); }
+  .dd-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0; right: 0;
+    background: #1E2A23;
+    border: 1px solid var(--dark-rule);
+    border-radius: 10px;
+    padding: 6px;
+    z-index: 10;
+    box-shadow: 0 20px 50px -20px rgba(0,0,0,0.6);
+    max-height: 280px;
+    overflow-y: auto;
+    display: none;
+  }
+  .dd.open .dd-panel { display: block; }
+  .dd-opt {
+    padding: 10px 12px;
+    border-radius: 7px;
+    color: var(--dark-ink);
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 120ms ease;
+  }
+  .dd-opt:hover, .dd-opt.focused {
+    background: rgba(184,145,90,0.14);
+    color: var(--gold-bright);
+  }
+  .dd-opt.selected { color: var(--gold-bright); }
+  .dd-opt .opt-hint {
+    display: block;
+    font-size: 11.5px;
+    color: var(--dark-ink-3);
+    margin-top: 2px;
+  }
+
+  .num-input {
+    width: 100%;
+    background: var(--dark-3);
+    border: 1px solid var(--dark-rule);
+    border-radius: 10px;
+    color: var(--dark-ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 500;
+    padding: 14px 16px;
+    transition: border-color 150ms ease;
+  }
+  .num-input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(184,145,90,0.18); }
+  .num-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+  /* Output side */
+  .score-viz {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+  }
+  .ring-wrap { position: relative; width: 240px; height: 240px; }
+  .ring-wrap svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring-track { stroke: var(--dark-rule); }
+  .ring-bar {
+    stroke: var(--gold);
+    transition: stroke-dashoffset 700ms cubic-bezier(.4,.2,.2,1), stroke 500ms ease;
+  }
+  .ring-bar.hi { stroke: var(--gold-bright); }
+  .ring-bar.mid { stroke: #C89752; }
+  .ring-bar.lo { stroke: #9E6A3A; }
+  .ring-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+  .ring-num {
+    font-family: var(--serif);
+    font-variation-settings: "opsz" 144, "SOFT" 30;
+    font-weight: 400;
+    font-size: 72px;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    color: var(--dark-ink);
+  }
+  .ring-lbl {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--gold-bright);
+    margin-top: 6px;
+    transition: color 300ms ease;
+  }
+  .reco {
+    text-align: center;
+    font-size: 14.5px;
+    line-height: 1.55;
+    color: var(--dark-ink-2);
+    max-width: 42ch;
+    min-height: 3.2em;
+  }
+  .bars { width: 100%; display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+  .bar-row {
+    display: grid;
+    grid-template-columns: 74px 1fr 42px;
+    align-items: center;
+    gap: 14px;
+    font-size: 13px;
+  }
+  .bar-row .bar-lbl { color: var(--dark-ink-2); font-weight: 500; }
+  .bar-row .bar-track {
+    height: 5px;
+    background: var(--dark-rule);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+  }
+  .bar-row .bar-fill {
+    position: absolute; top: 0; bottom: 0; left: 0;
+    background: var(--gold);
+    border-radius: 3px;
+    transition: width 700ms cubic-bezier(.4,.2,.2,1);
+  }
+  .bar-row .bar-val { font-family: var(--mono); font-size: 12px; color: var(--gold-bright); text-align: right; }
+
+  /* ---- How it works ---- */
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    background: var(--rule);
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+  .step {
+    background: var(--bg);
+    padding: clamp(32px, 4vw, 48px);
+    position: relative;
+    min-height: 320px;
+    display: flex;
+    flex-direction: column;
+  }
+  .step-n {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.22em;
+    color: var(--ink-4);
+    margin-bottom: 24px;
+  }
+  .step h3 {
+    font-family: var(--serif);
+    font-variation-settings: "opsz" 36;
+    font-weight: 500;
+    font-size: clamp(24px, 2.4vw, 30px);
+    line-height: 1.08;
+    letter-spacing: -0.018em;
+    color: var(--ink);
+    margin: 0 0 16px;
+  }
+  .step p {
+    font-size: 15.5px;
+    line-height: 1.55;
+    color: var(--ink-3);
+    margin: 0;
+    flex: 1;
+  }
+  .step-ic {
+    margin-top: 28px;
+    color: var(--forest);
+  }
+
+  /* ---- Origin (dark) ---- */
+  .origin {
+    background: var(--dark);
+    color: var(--dark-ink);
+  }
+  .origin .wrap {
+    display: grid;
+    grid-template-columns: 0.7fr 1.3fr;
+    gap: clamp(40px, 6vw, 100px);
+    align-items: start;
+  }
+  .origin .kicker { color: var(--gold-bright); }
+  .origin .kicker::before { background: var(--gold); box-shadow: 0 0 0 4px rgba(184,145,90,0.15); }
+  .origin h2 {
+    font-family: var(--serif);
+    font-variation-settings: "opsz" 144, "SOFT" 30;
+    font-weight: 400;
+    font-size: clamp(30px, 3.6vw, 46px);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    color: var(--dark-ink);
+    margin: 16px 0 0;
+  }
+  .origin-body {
+    font-family: var(--serif);
+    font-variation-settings: "opsz" 24, "SOFT" 60;
+    font-weight: 350;
+    font-size: clamp(20px, 2vw, 26px);
+    line-height: 1.45;
+    color: var(--dark-ink);
+    max-width: 52ch;
+  }
+  .origin-body p { margin: 0 0 1em; }
+  .origin-body p:last-child { margin-bottom: 0; }
+  .origin-body em { font-style: italic; color: var(--gold-bright); }
+  .origin-sign {
+    margin-top: 36px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-family: var(--sans);
+    font-size: 14px;
+    color: var(--dark-ink-2);
+  }
+  .origin-sign .dot {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--gold);
+    color: var(--dark);
+    display: grid; place-items: center;
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 15px;
+  }
+
+  /* ---- Before / After ---- */
+  .ba-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .ba-col {
+    background: var(--bg-card);
+    padding: clamp(32px, 4vw, 48px);
+  }
+  .ba-col.right {
+    background: var(--dark);
+    color: var(--dark-ink);
+  }
+  .ba-col .ba-kick {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin-bottom: 10px;
+  }
+  .ba-col.right .ba-kick { color: var(--gold-bright); }
+  .ba-col h3 {
+    font-family: var(--serif);
+    font-variation-settings: "opsz" 48;
+    font-weight: 500;
+    font-size: clamp(22px, 2.4vw, 30px);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    margin: 0 0 28px;
+  }
+  .ba-col.right h3 { color: var(--dark-ink); }
+  .ba-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 18px; }
+  .ba-list li {
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    gap: 14px;
+    font-size: 15.5px;
+    line-height: 1.5;
+    color: var(--ink-2);
+  }
+  .ba-col.right .ba-list li { color: var(--dark-ink); }
+  .ba-list li .mk {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--ink-4);
+    padding-top: 1px;
+  }
+  .ba-col.right .ba-list li .mk { color: var(--gold); }
+
+  /* ---- Trust signals ---- */
+  .trust-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2px;
+    background: var(--rule);
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+  .trust-item {
+    background: var(--bg);
+    padding: clamp(28px, 3vw, 40px) clamp(22px, 2.5vw, 32px);
+  }
+  .trust-num {
+    font-family: var(--serif);
+    font-variation-settings: "opsz" 144, "SOFT" 30;
+    font-weight: 400;
+    font-size: clamp(32px, 4vw, 48px);
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: var(--forest);
+    margin-bottom: 14px;
+  }
+  .trust-num .small { font-size: 0.5em; color: var(--ink-3); margin-left: 2px; }
+  .trust-lbl {
+    font-size: 14px;
+    color: var(--ink-2);
+    line-height: 1.5;
+  }
+  .trust-src {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--ink-4);
+    margin-top: 14px;
+  }
+
+  /* ---- Waitlist ---- */
+  .waitlist {
+    padding: clamp(80px, 10vw, 140px) var(--pad-x);
+    background: var(--bg-soft);
+    border-top: 1px solid var(--rule);
+  }
+  .wl-inner {
+    max-width: 820px;
+    margin: 0 auto;
+    text-align: center;
+  }
+  .wl-inner h2 {
+    font-family: var(--serif);
+    font-variation-settings: "opsz" 144, "SOFT" 30;
+    font-weight: 420;
+    font-size: clamp(36px, 5.4vw, 66px);
+    line-height: 1;
+    letter-spacing: -0.024em;
+    color: var(--ink);
+    margin: 18px 0 24px;
+  }
+  .wl-inner h2 em { font-style: italic; color: var(--forest); font-variation-settings: "opsz" 144, "SOFT" 80; }
+  .wl-inner p { font-size: 17px; color: var(--ink-3); margin: 0 auto 40px; max-width: 52ch; line-height: 1.55; }
+  .wl-form {
+    background: var(--bg-card);
+    border: 1px solid var(--rule);
+    border-radius: 16px;
+    padding: clamp(20px, 3vw, 32px);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    text-align: left;
+    box-shadow: 0 20px 60px -40px rgba(20,24,26,0.3);
+  }
+  .wl-form .wl-field { display: flex; flex-direction: column; gap: 6px; }
+  .wl-form .wl-field.full { grid-column: span 2; }
+  .wl-form label {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-4);
+  }
+  .wl-form input, .wl-form .wl-select {
+    font-family: var(--sans);
+    font-size: 15px;
+    padding: 12px 14px;
+    background: var(--bg);
+    color: var(--ink);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    width: 100%;
+    transition: border-color 150ms ease;
+  }
+  .wl-form input:focus, .wl-form .wl-select:focus {
+    outline: none;
+    border-color: var(--forest);
+    box-shadow: 0 0 0 3px rgba(31,59,42,0.12);
+  }
+  .wl-form input::placeholder { color: var(--ink-4); }
+
+  .wl-select-wrap { position: relative; }
+  .wl-select {
+    cursor: pointer;
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .wl-select .chev {
+    width: 10px; height: 10px;
+    color: var(--ink-3);
+    transition: transform 180ms ease;
+  }
+  .wl-select-wrap.open .chev { transform: rotate(180deg); }
+  .wl-select-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0; right: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 6px;
+    z-index: 10;
+    box-shadow: 0 20px 50px -20px rgba(0,0,0,0.18);
+    display: none;
+  }
+  .wl-select-wrap.open .wl-select-panel { display: block; }
+  .wl-select-opt {
+    padding: 10px 12px;
+    border-radius: 7px;
+    font-size: 14px;
+    color: var(--ink-2);
+    cursor: pointer;
+  }
+  .wl-select-opt:hover, .wl-select-opt.focused {
+    background: var(--bg);
+    color: var(--ink);
+  }
+  .wl-select-opt.selected { color: var(--forest); }
+
+  .wl-submit-row {
+    grid-column: span 2;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding-top: 6px;
+  }
+  .wl-fine { font-size: 12.5px; color: var(--ink-4); max-width: 40ch; text-align: left; }
+  .wl-fine b { color: var(--ink-3); font-weight: 600; }
+  .wl-success {
+    grid-column: span 2;
+    text-align: center;
+    padding: 28px;
+    color: var(--forest);
+    font-family: var(--serif);
+    font-variation-settings: "opsz" 48;
+    font-size: 22px;
+    display: none;
+  }
+  .wl-success.show { display: block; }
+  .wl-success .check {
+    display: inline-grid; place-items: center;
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: var(--forest);
+    color: var(--bg-card);
+    margin-bottom: 14px;
+  }
+
+  /* ---- FAQ ---- */
+  .faq {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: clamp(80px, 10vw, 140px) var(--pad-x);
+    display: grid;
+    grid-template-columns: 0.6fr 1.4fr;
+    gap: clamp(40px, 6vw, 90px);
+    align-items: start;
+  }
+  .faq h2 {
+    font-family: var(--serif);
+    font-variation-settings: "opsz" 144, "SOFT" 30;
+    font-weight: 400;
+    font-size: clamp(32px, 4vw, 48px);
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    margin: 16px 0 0;
+  }
+  .faq-list { border-top: 1px solid var(--rule); }
+  .faq-item { border-bottom: 1px solid var(--rule); }
+  .faq-q {
+    width: 100%;
+    background: transparent;
+    border: 0;
+    padding: 24px 0;
+    text-align: left;
+    font-family: var(--serif);
+    font-variation-settings: "opsz" 36;
+    font-weight: 500;
+    font-size: clamp(19px, 1.8vw, 22px);
+    color: var(--ink);
+    letter-spacing: -0.012em;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+  }
+  .faq-q:hover { color: var(--forest); }
+  .faq-q .plus {
+    width: 22px; height: 22px;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .faq-q .plus::before, .faq-q .plus::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 0;
+    width: 100%; height: 1.5px;
+    background: var(--ink-3);
+    transform-origin: center;
+    transition: transform 250ms ease;
+  }
+  .faq-q .plus::after { transform: rotate(90deg); }
+  .faq-item.open .faq-q .plus::after { transform: rotate(0); }
+  .faq-a {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 350ms ease;
+  }
+  .faq-item.open .faq-a { max-height: 400px; }
+  .faq-a-inner {
+    padding: 0 0 28px;
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--ink-3);
+    max-width: 60ch;
+  }
+  .faq-a-inner b { color: var(--ink-2); font-weight: 600; }
+
+  /* ---- Footer ---- */
+  footer {
+    background: var(--dark);
+    color: var(--dark-ink-2);
+    padding: clamp(60px, 7vw, 100px) var(--pad-x) 40px;
+  }
+  .ft-grid {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 40px;
+    padding-bottom: 48px;
+    border-bottom: 1px solid var(--dark-rule);
+  }
+  .ft-grid .ft-brand .logo { color: var(--dark-ink); }
+  .ft-grid .ft-brand p {
+    font-family: var(--serif);
+    font-variation-settings: "opsz" 24;
+    font-size: 17px;
+    line-height: 1.45;
+    color: var(--dark-ink-2);
+    max-width: 38ch;
+    margin: 18px 0 0;
+  }
+  .ft-col h4 {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--dark-ink-3);
+    margin: 0 0 14px;
+    font-weight: 500;
+  }
+  .ft-col a {
+    display: block;
+    color: var(--dark-ink-2);
+    text-decoration: none;
+    font-size: 14px;
+    padding: 6px 0;
+    transition: color 150ms ease;
+  }
+  .ft-col a:hover { color: var(--gold-bright); }
+  .ft-bot {
+    max-width: var(--maxw);
+    margin: 32px auto 0;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    color: var(--dark-ink-3);
+  }
+
+  /* ---- Reveal animation ---- */
+  .reveal {
+    opacity: 0;
+    transform: translateY(18px);
+    transition: opacity 800ms cubic-bezier(.2,.7,.2,1), transform 800ms cubic-bezier(.2,.7,.2,1);
+  }
+  .reveal.in { opacity: 1; transform: none; }
+
+  /* ---- Responsive ---- */
+  @media (max-width: 960px) {
+    .hero-grid { grid-template-columns: 1fr; }
+    .hero-visual { padding-top: 10px; max-width: 420px; }
+    .sec-head { grid-template-columns: 1fr; }
+    .fight-card { grid-template-columns: 1fr; }
+    .origin .wrap { grid-template-columns: 1fr; }
+    .ba-grid { grid-template-columns: 1fr; }
+    .strip-inner { grid-template-columns: 1fr; gap: 36px; }
+    .strip-inner::before, .strip-inner::after { display: none; }
+    .steps { grid-template-columns: 1fr; }
+    .trust-grid { grid-template-columns: repeat(2, 1fr); }
+    .faq { grid-template-columns: 1fr; }
+    .ft-grid { grid-template-columns: 1fr 1fr; gap: 32px; }
+    .wl-form { grid-template-columns: 1fr; }
+    .wl-form .wl-field.full { grid-column: span 1; }
+    .wl-submit-row { grid-column: span 1; }
+  }
+  @media (max-width: 560px) {
+    .trust-grid { grid-template-columns: 1fr; }
+    .ft-grid { grid-template-columns: 1fr; }
+    .nav-link { display: none; }
+    .ring-wrap { width: 200px; height: 200px; }
+    .ring-num { font-size: 58px; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="top" id="topnav">
+  <div class="nav-inner">
+    <a href="#" class="logo">
+      <span class="logo-mark">CR</span>
+      <span>ClaimRight</span>
+    </a>
+    <div class="nav-right">
+      <a href="#how" class="nav-link">How it works</a>
+      <a href="#score" class="nav-link">Try the score</a>
+      <a href="#faq" class="nav-link">FAQ</a>
+      <a href="#waitlist" class="btn btn-primary">Join waitlist
+        <svg class="arr" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+      </a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-grid">
+    <div class="hero-left reveal">
+      <span class="kicker">Waitlist · Launching 2026</span>
+      <h1>Your claim was rejected. You have <em>more leverage</em> than your insurer told you.</h1>
+      <p class="hero-sub">ClaimRight turns a health insurance rejection letter into a filed-ready dispute pack in five minutes, backed by IRDAI rules and real ombudsman rulings. Built for India's policyholders.</p>
+      <div class="hero-actions">
+        <a href="#waitlist" class="btn btn-primary btn-lg">
+          Join the waitlist
+          <svg class="arr" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </a>
+        <a href="#score" class="btn btn-ghost btn-lg">
+          Try the Fightability Score
+        </a>
+      </div>
+      <p class="hero-meta" style="margin-top: 28px;">
+        <b>Free case assessment.</b> Flat fee only if you choose to proceed.
+      </p>
+    </div>
+
+    <div class="hero-visual reveal">
+      <div class="hero-card">
+        <div class="lbl">Letter from insurer</div>
+        <div class="lh">
+          Dear Policyholder, we regret to inform you that your claim of
+          <b>₹1,48,240</b> has been <b>rejected</b>. Reason: <span class="strike">non-disclosure of pre-existing condition</span> under clause 4.3(a).
+        </div>
+        <div class="lh" style="color: var(--ink-4); font-size: 12.5px; font-family: var(--mono);">
+          Signed. Filed. Closed. — most people stop here.
+        </div>
+      </div>
+      <div class="arrow-to">
+        <svg width="22" height="42" viewBox="0 0 22 42" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M11 2v36M3 31l8 8 8-8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="hero-card-2">
+        <div class="lbl">Dispute pack (5 min later)</div>
+        <div class="lh">
+          Insurer cited PED clause without the mandatory <span class="cite">PMC review</span> required under PPOI Master Circular §6.2. Moratorium clock started <span class="cite">38 months ago</span>. Claim is non-repudiable.
+        </div>
+        <div class="lh" style="font-family: var(--mono); font-size: 11.5px; color: var(--dark-ink-3); margin: 0;">
+          Escalation path ready. GRO filed. 15-day clock active.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS STRIP -->
+<section class="strip reveal">
+  <div class="strip-inner">
+    <div>
+      <span class="stat-num">₹26,037<span class="unit">Cr</span></span>
+      <p class="stat-lbl">Health claims <b>rejected or disallowed</b> by Indian insurers in FY 2023–24. 19% higher than the year before.</p>
+    </div>
+    <div>
+      <span class="stat-num">87<span class="unit">%</span></span>
+      <p class="stat-lbl">Win rate when policyholders <b>actually dispute</b> their rejection. The numbers are already on your side.</p>
+    </div>
+    <div>
+      <span class="stat-num">&lt;1<span class="unit">%</span></span>
+      <p class="stat-lbl">Of rejected claimants <b>fight back</b>. Insurers price in your silence. ClaimRight is built to change that.</p>
+    </div>
+  </div>
+</section>
+
+<!-- FIGHTABILITY SCORE -->
+<section class="pad fight-sec" id="score">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div>
+        <span class="kicker">Live demo · Fightability Score</span>
+        <h2>See how <em>fightable</em> your case is.</h2>
+      </div>
+      <p>The score is a rules-based composite over six weighted variables: your rejection reason, ombudsman precedent match, insurer track record, documentation, timing, and claim amount. Same engine we'll run on real cases. It recalibrates with every resolved case, which is the heart of the data flywheel.</p>
+    </div>
+
+    <div class="fight-card reveal">
+      <div class="fight-inputs">
+        <div class="field">
+          <label class="field-lbl">Rejection reason category</label>
+          <div class="dd" data-field="reason">
+            <button class="dd-btn" type="button">
+              <span class="dd-label">Unanswered query / procedural delay</span>
+            </button>
+            <svg class="dd-chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 4.5L6 8.5L10 4.5"/></svg>
+            <div class="dd-panel"></div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-lbl">Ombudsman precedent match</label>
+          <div class="dd" data-field="precedent">
+            <button class="dd-btn" type="button">
+              <span class="dd-label">Partial precedent · some similar rulings</span>
+            </button>
+            <svg class="dd-chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 4.5L6 8.5L10 4.5"/></svg>
+            <div class="dd-panel"></div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-lbl">Insurer category</label>
+          <div class="dd" data-field="insurer">
+            <button class="dd-btn" type="button">
+              <span class="dd-label">Private general insurer</span>
+            </button>
+            <svg class="dd-chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 4.5L6 8.5L10 4.5"/></svg>
+            <div class="dd-panel"></div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-lbl">Documentation status</label>
+          <div class="dd" data-field="docs">
+            <button class="dd-btn" type="button">
+              <span class="dd-label">Complete · hospital bills, reports, discharge</span>
+            </button>
+            <svg class="dd-chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 4.5L6 8.5L10 4.5"/></svg>
+            <div class="dd-panel"></div>
+          </div>
+        </div>
+
+        <div class="num-pair">
+          <div class="field">
+            <label class="field-lbl">Claim amount (₹)</label>
+            <input class="num-input" type="number" id="claim-amount" value="150000" min="0" step="5000" />
+          </div>
+          <div class="field">
+            <label class="field-lbl">Days since rejection</label>
+            <input class="num-input" type="number" id="days-since" value="25" min="0" step="1" />
+          </div>
+        </div>
+      </div>
+
+      <div class="score-viz">
+        <div class="ring-wrap">
+          <svg viewBox="0 0 240 240">
+            <circle class="ring-track" cx="120" cy="120" r="104" fill="none" stroke-width="10" />
+            <circle id="ring-bar" class="ring-bar" cx="120" cy="120" r="104" fill="none" stroke-width="10"
+                    stroke-linecap="round" stroke-dasharray="653.45" stroke-dashoffset="130.69" />
+          </svg>
+          <div class="ring-center">
+            <span class="ring-num" id="score-num">80</span>
+            <span class="ring-lbl" id="score-lbl">Highly fightable</span>
+          </div>
+        </div>
+        <p class="reco" id="reco">Strong case. We recommend escalating directly to the Insurance Ombudsman after the 15-day GRO response window lapses.</p>
+        <div class="bars" id="bars"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="pad" id="how">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div>
+        <span class="kicker">The process</span>
+        <h2>Three steps. Five minutes. <em>No lawyer.</em></h2>
+      </div>
+      <p>ClaimRight reads the rejection letter, maps it against the regulations insurers hope you never read, and gives you a pack that's ready to file with the Insurance Ombudsman. You stay in control the whole way.</p>
+    </div>
+  </div>
+
+  <div class="steps reveal">
+    <div class="step">
+      <div class="step-n">Step 01</div>
+      <h3>Upload the rejection letter and your policy.</h3>
+      <p>PDFs, WhatsApp screenshots, scanned photos — whatever your insurer sent. We pull out the claim number, the reason code, the dates, and the exact clause the insurer cited.</p>
+      <svg class="step-ic" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h4"/>
+      </svg>
+    </div>
+    <div class="step">
+      <div class="step-n">Step 02</div>
+      <h3>We map your case to the IRDAI rules and ombudsman rulings that apply.</h3>
+      <p>Master Circular §6.2. PPOI moratorium clock. The 1-hour cashless deadline. The 2% interest clause on delayed settlements. We cite every argument to the exact regulation and to real ombudsman awards on similar cases.</p>
+      <svg class="step-ic" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+    </div>
+    <div class="step">
+      <div class="step-n">Step 03</div>
+      <h3>You get a dispute pack, ready to file.</h3>
+      <p>Drafted letter in your words. Citation index. Escalation timeline. Everything you need to file with GRO, Bima Bharosa, or the Ombudsman. Track the response clock inside the app.</p>
+      <svg class="step-ic" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- ORIGIN -->
+<section class="pad origin">
+  <div class="wrap">
+    <div class="reveal">
+      <span class="kicker">Why this exists</span>
+      <h2>One 200-page circular stood between my mother and her claim.</h2>
+    </div>
+    <div class="origin-body reveal">
+      <p>The insurer waited 90 days, then rejected her hospital claim with a one-line reason: a broad exclusion clause we'd never seen flagged before. My father had just lost his job. We paid the hospital out of pocket.</p>
+      <p>I spent three weeks reading the IRDAI Master Circular. The delay was already prohibited. The exclusion was already limited. One filing at the Ombudsman. Forty-five days later, <em>the money came back with interest.</em></p>
+      <p>Most families do not have someone to read the circular. ClaimRight is that person, built into a product.</p>
+      <div class="origin-sign">
+        <span class="dot">A</span>
+        <span>Asher Elgin · Founder, ClaimRight</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BEFORE / AFTER -->
+<section class="pad">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div>
+        <span class="kicker">The gap</span>
+        <h2>What your insurer was <em>counting on.</em></h2>
+      </div>
+      <p>Insurers price your premium assuming a baseline rate of silence after rejection. Fewer than 1 in 100 policyholders escalate. Here is what that silence looks like, side by side with what the playbook actually allows.</p>
+    </div>
+
+    <div class="ba-grid reveal">
+      <div class="ba-col">
+        <div class="ba-kick">What they expected</div>
+        <h3>You pay the hospital and move on.</h3>
+        <ul class="ba-list">
+          <li><span class="mk">01</span><span>You absorb the bill as a household emergency and never raise a formal dispute.</span></li>
+          <li><span class="mk">02</span><span>You forget the claim number within two months. The rejection letter goes into a folder.</span></li>
+          <li><span class="mk">03</span><span>You assume fighting requires a lawyer, will cost lakhs, and will take years in consumer court.</span></li>
+          <li><span class="mk">04</span><span>You don't know about the 15-day GRO response window, the 2% monthly interest clause, or that piecemeal document requests are prohibited.</span></li>
+        </ul>
+      </div>
+      <div class="ba-col right">
+        <div class="ba-kick">What ClaimRight does</div>
+        <h3>The rejection becomes a filed dispute.</h3>
+        <ul class="ba-list">
+          <li><span class="mk">01</span><span>Pinpoints the exact IRDAI clause the insurer violated, with citation.</span></li>
+          <li><span class="mk">02</span><span>Surfaces ombudsman awards on cases like yours, with ruling dates and amounts.</span></li>
+          <li><span class="mk">03</span><span>Drafts the dispute letter in your voice. Ombudsman filings are free. No lawyer allowed. 94.5% of cases go the policyholder's way.</span></li>
+          <li><span class="mk">04</span><span>Tracks the 15-day clock, triggers escalation to Bima Bharosa, then to the Ombudsman if the insurer stays silent.</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRUST SIGNALS -->
+<section class="pad" style="padding-top: 0;">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div>
+        <span class="kicker">The evidence</span>
+        <h2>The numbers are already on your side.</h2>
+      </div>
+      <p>Every argument ClaimRight generates is sourced. Here is a sample of the rules and rulings that do most of the work for policyholders who know to invoke them.</p>
+    </div>
+  </div>
+  <div class="trust-grid reveal">
+    <div class="trust-item">
+      <div class="trust-num">94.5<span class="small">%</span></div>
+      <div class="trust-lbl">Of ombudsman cases resolved in the policyholder's favor in FY 2023–24.</div>
+      <div class="trust-src">IRDAI Annual Report</div>
+    </div>
+    <div class="trust-item">
+      <div class="trust-num">30<span class="small"> days</span></div>
+      <div class="trust-lbl">Maximum settlement window for reimbursement claims. After that, interest applies.</div>
+      <div class="trust-src">Master Circular · 29.05.2024</div>
+    </div>
+    <div class="trust-item">
+      <div class="trust-num">2<span class="small">% / mo</span></div>
+      <div class="trust-lbl">Interest insurers owe on delayed settlements. Most policyholders never claim it.</div>
+      <div class="trust-src">Master Circular §4.3</div>
+    </div>
+    <div class="trust-item">
+      <div class="trust-num">₹5,000<span class="small"> / day</span></div>
+      <div class="trust-lbl">Penalty insurers owe you for non-compliance with ombudsman awards past 30 days.</div>
+      <div class="trust-src">Insurance Ombudsman Rules</div>
+    </div>
+  </div>
+</section>
+
+<!-- WAITLIST -->
+<section class="waitlist" id="waitlist">
+  <div class="wl-inner">
+    <span class="kicker reveal">Join the waitlist</span>
+    <h2 class="reveal">Be first to <em>actually use it.</em></h2>
+    <p class="reveal">We're onboarding cases from mid-2026, starting with states where ombudsman caseloads are heaviest. Join the list and we'll reach out when we open for your region.</p>
+
+    <form class="wl-form reveal" id="wl-form" onsubmit="return submitWaitlist(event)">
+      <div class="wl-field">
+        <label for="wl-name">Your name</label>
+        <input id="wl-name" type="text" placeholder="Full name" required />
+      </div>
+      <div class="wl-field">
+        <label for="wl-email">Email</label>
+        <input id="wl-email" type="email" placeholder="you@example.com" required />
+      </div>
+      <div class="wl-field full">
+        <label>What brings you here?</label>
+        <div class="wl-select-wrap" data-field="status">
+          <button type="button" class="wl-select">
+            <span class="wl-sel-label">Just rejected — actively looking for help</span>
+            <svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 4.5L6 8.5L10 4.5"/></svg>
+          </button>
+          <div class="wl-select-panel"></div>
+        </div>
+      </div>
+      <div class="wl-submit-row">
+        <p class="wl-fine"><b>We don't store your name or phone number</b> until you explicitly submit a case. No spam. One email when we open for your region.</p>
+        <button type="submit" class="btn btn-primary btn-lg">
+          Add me to the waitlist
+          <svg class="arr" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+      <div class="wl-success" id="wl-success">
+        <div class="check">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5 9-11"/></svg>
+        </div>
+        You're on the list. We'll reach out when we open for your region.
+      </div>
+    </form>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="faq" id="faq">
+  <div class="reveal">
+    <span class="kicker">Questions</span>
+    <h2>Good things to know.</h2>
+  </div>
+  <div class="faq-list reveal">
+    <div class="faq-item open">
+      <button class="faq-q" type="button">
+        What actually comes in a dispute pack?<span class="plus"></span>
+      </button>
+      <div class="faq-a">
+        <div class="faq-a-inner">
+          <b>A filed-ready bundle:</b> a dispute letter drafted in your voice, an index of the IRDAI clauses the insurer violated, a list of ombudsman awards on similar cases with ruling dates, the exact escalation path to follow (GRO first, then Bima Bharosa, then Ombudsman), and a clock that tracks each response deadline.
+        </div>
+      </div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" type="button">
+        How much does it cost?<span class="plus"></span>
+      </button>
+      <div class="faq-a">
+        <div class="faq-a-inner">
+          The <b>case assessment is free.</b> If you choose to proceed, the dispute pack is an affordable flat fee — pricing will be finalized at launch. We don't take a percentage cut of your claim.
+        </div>
+      </div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" type="button">
+        Do I need a lawyer?<span class="plus"></span>
+      </button>
+      <div class="faq-a">
+        <div class="faq-a-inner">
+          <b>No.</b> The Insurance Ombudsman process is designed to work without one — lawyers are actually not permitted to represent you at ombudsman hearings. Most policyholders represent themselves. 94.5% of cases are resolved in the policyholder's favor.
+        </div>
+      </div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" type="button">
+        What if my rejection was a while ago?<span class="plus"></span>
+      </button>
+      <div class="faq-a">
+        <div class="faq-a-inner">
+          You can file with the Insurance Ombudsman <b>up to one year</b> from the date of the insurer's final response, or from the end of the 30-day GRO window if they never responded. The Fightability Score above factors timing in automatically.
+        </div>
+      </div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q" type="button">
+        Is my data safe?<span class="plus"></span>
+      </button>
+      <div class="faq-a">
+        <div class="faq-a-inner">
+          We anonymize PII before any processing. No names, phone numbers, or hospital identifiers are stored unless you explicitly submit a case. All uploads are encrypted at rest. Consent-based, every step.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="ft-grid">
+    <div class="ft-brand">
+      <a href="#" class="logo">
+        <span class="logo-mark">CR</span>
+        <span>ClaimRight</span>
+      </a>
+      <p>An AI co-pilot for Indian policyholders fighting wrongful health insurance rejections.</p>
+    </div>
+    <div class="ft-col">
+      <h4>Product</h4>
+      <a href="#how">How it works</a>
+      <a href="#score">Fightability Score</a>
+      <a href="#waitlist">Waitlist</a>
+    </div>
+    <div class="ft-col">
+      <h4>Trust</h4>
+      <a href="#">Data & privacy</a>
+      <a href="#">IRDAI references</a>
+      <a href="#">Ombudsman portal</a>
+    </div>
+    <div class="ft-col">
+      <h4>Contact</h4>
+      <a href="mailto:hello@claimright.in">hello@claimright.in</a>
+      <a href="#">Press</a>
+    </div>
+  </div>
+  <div class="ft-bot">
+    <span>© 2026 CLAIMRIGHT · BUILT IN INDIA</span>
+    <span>NOT A LAW FIRM · NOT LEGAL ADVICE · REGULATED GUIDANCE ONLY</span>
+  </div>
+</footer>
+
+<script>
+  /* ---- Nav scroll shadow ---- */
+  const nav = document.getElementById('topnav');
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 10);
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  /* ---- Reveal on scroll ---- */
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('in');
+        io.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.14, rootMargin: '0px 0px -60px 0px' });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  /* =============================================
+     FIGHTABILITY SCORE
+     ============================================= */
+
+  const OPTIONS = {
+    reason: [
+      { val: 'unanswered', label: 'Unanswered query / procedural delay', hint: 'Piecemeal document requests are prohibited under the Master Circular', score: 0.95 },
+      { val: 'broad_exclusion', label: 'Broad / vague exclusion clause', hint: 'Courts and ombudsmen routinely reject non-specific exclusions', score: 0.88 },
+      { val: 'ped', label: 'Pre-existing disease (non-disclosure)', hint: 'Requires PMC review under PPOI §6.2; moratorium may apply', score: 0.55 },
+      { val: 'not_necessary', label: 'Not medically necessary', hint: 'Burden of proof shifts to insurer with treating-doctor note', score: 0.70 },
+      { val: 'delay_intimation', label: 'Delay in claim intimation', hint: 'Delay alone cannot repudiate a valid claim (SC precedent)', score: 0.82 },
+      { val: 'policy_lapsed', label: 'Policy lapsed / waiting period issue', hint: 'Fightable only if grace-period or renewal rules apply', score: 0.35 },
+      { val: 'insuff_docs', label: 'Insufficient documentation', hint: 'Must have been requested in one consolidated list', score: 0.72 },
+    ],
+    precedent: [
+      { val: 'strong', label: 'Strong · multiple similar ombudsman rulings', score: 0.90 },
+      { val: 'partial', label: 'Partial · some similar rulings', score: 0.60 },
+      { val: 'weak', label: 'Weak · limited precedent available', score: 0.32 },
+    ],
+    insurer: [
+      { val: 'psu', label: 'Public sector insurer', hint: 'Higher settlement pressure after GRO filing', score: 0.78 },
+      { val: 'private', label: 'Private general insurer', hint: 'Most common; average compliance record', score: 0.65 },
+      { val: 'standalone', label: 'Standalone health insurer', hint: 'Faster response windows, tighter scrutiny', score: 0.72 },
+    ],
+    docs: [
+      { val: 'complete', label: 'Complete · bills, reports, discharge summary', score: 0.92 },
+      { val: 'most', label: 'Most present · one or two items missing', score: 0.72 },
+      { val: 'partial', label: 'Partial · key documents missing', score: 0.48 },
+    ],
+  };
+
+  const STATE = {
+    reason: OPTIONS.reason[0],
+    precedent: OPTIONS.precedent[1],
+    insurer: OPTIONS.insurer[1],
+    docs: OPTIONS.docs[0],
+    amount: 150000,
+    days: 25,
+  };
+
+  /* ---- Build custom dropdowns ---- */
+  function buildDropdown(el) {
+    const field = el.dataset.field;
+    const panel = el.querySelector('.dd-panel');
+    const btn = el.querySelector('.dd-btn .dd-label');
+    const opts = OPTIONS[field];
+
+    panel.innerHTML = opts.map((o, i) =>
+      `<div class="dd-opt ${i === opts.indexOf(STATE[field]) ? 'selected' : ''}" data-val="${o.val}">
+        ${o.label}
+        ${o.hint ? `<span class="opt-hint">${o.hint}</span>` : ''}
+      </div>`
+    ).join('');
+
+    el.querySelector('.dd-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.querySelectorAll('.dd.open').forEach(d => { if (d !== el) d.classList.remove('open'); });
+      el.classList.toggle('open');
+    });
+
+    panel.querySelectorAll('.dd-opt').forEach(optEl => {
+      optEl.addEventListener('click', () => {
+        const chosen = opts.find(o => o.val === optEl.dataset.val);
+        STATE[field] = chosen;
+        btn.textContent = chosen.label;
+        panel.querySelectorAll('.dd-opt').forEach(x => x.classList.remove('selected'));
+        optEl.classList.add('selected');
+        el.classList.remove('open');
+        recompute();
+      });
+    });
+
+    // initial label
+    btn.textContent = STATE[field].label;
+  }
+
+  document.querySelectorAll('.dd').forEach(buildDropdown);
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.dd')) {
+      document.querySelectorAll('.dd.open').forEach(d => d.classList.remove('open'));
+    }
+    if (!e.target.closest('.wl-select-wrap')) {
+      document.querySelectorAll('.wl-select-wrap.open').forEach(d => d.classList.remove('open'));
+    }
+  });
+
+  /* ---- Numeric inputs ---- */
+  document.getElementById('claim-amount').addEventListener('input', (e) => {
+    STATE.amount = Math.max(0, Number(e.target.value) || 0);
+    recompute();
+  });
+  document.getElementById('days-since').addEventListener('input', (e) => {
+    STATE.days = Math.max(0, Number(e.target.value) || 0);
+    recompute();
+  });
+
+  /* ---- Scoring ---- */
+  function timingScore(days) {
+    if (days <= 30) return 0.95;
+    if (days <= 90) return 0.88;
+    if (days <= 180) return 0.75;
+    if (days <= 365) return 0.55;
+    return 0.28;
+  }
+  function amountScore(amt) {
+    if (amt < 5000) return 0.35;
+    if (amt < 25000) return 0.72;
+    if (amt < 100000) return 0.88;
+    if (amt < 500000) return 0.95;
+    return 0.98;
+  }
+
+  const WEIGHTS = {
+    reason: 0.25, precedent: 0.18, insurer: 0.10,
+    docs: 0.17, timing: 0.15, amount: 0.15,
+  };
+
+  function classify(score) {
+    if (score >= 75) return { lbl: 'Highly fightable', cls: 'hi',
+      reco: 'Strong case. We recommend escalating directly to the Insurance Ombudsman after the 15-day GRO response window lapses.' };
+    if (score >= 55) return { lbl: 'Fightable', cls: 'mid',
+      reco: 'Reasonable case. File at GRO first, then escalate through Bima Bharosa to Ombudsman if needed.' };
+    if (score >= 35) return { lbl: 'Needs work', cls: 'lo',
+      reco: 'Weaker case as-is. Documentation or a medical second opinion would materially improve your position.' };
+    return { lbl: 'Low odds', cls: 'lo',
+      reco: 'Case is weak under current rules. We would advise against filing without additional evidence.' };
+  }
+
+  function recompute() {
+    const sub = {
+      reason: STATE.reason.score,
+      precedent: STATE.precedent.score,
+      insurer: STATE.insurer.score,
+      docs: STATE.docs.score,
+      timing: timingScore(STATE.days),
+      amount: amountScore(STATE.amount),
+    };
+    let total = 0;
+    for (const k in WEIGHTS) total += sub[k] * WEIGHTS[k];
+    const pct = Math.round(total * 100);
+
+    const { lbl, cls, reco } = classify(pct);
+
+    const numEl = document.getElementById('score-num');
+    const lblEl = document.getElementById('score-lbl');
+    const recoEl = document.getElementById('reco');
+    const bar = document.getElementById('ring-bar');
+
+    animateNum(numEl, parseInt(numEl.textContent, 10) || 0, pct, 500);
+    lblEl.textContent = lbl;
+    recoEl.textContent = reco;
+
+    const circ = 2 * Math.PI * 104;
+    bar.setAttribute('stroke-dasharray', circ.toFixed(2));
+    bar.setAttribute('stroke-dashoffset', (circ * (1 - pct / 100)).toFixed(2));
+    bar.classList.remove('hi', 'mid', 'lo');
+    bar.classList.add(cls);
+
+    // Bars
+    const bars = document.getElementById('bars');
+    const order = [
+      ['Reason', sub.reason],
+      ['Precedent', sub.precedent],
+      ['Insurer', sub.insurer],
+      ['Docs', sub.docs],
+      ['Timing', sub.timing],
+      ['Amount', sub.amount],
+    ];
+    bars.innerHTML = order.map(([lbl, v]) =>
+      `<div class="bar-row">
+        <div class="bar-lbl">${lbl}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${(v * 100).toFixed(0)}%"></div></div>
+        <div class="bar-val">${v.toFixed(2)}</div>
+      </div>`
+    ).join('');
+  }
+
+  function animateNum(el, from, to, dur) {
+    const start = performance.now();
+    const step = (t) => {
+      const p = Math.min(1, (t - start) / dur);
+      const eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(from + (to - from) * eased);
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  recompute();
+
+  /* =============================================
+     WAITLIST SELECT
+     ============================================= */
+  const WL_STATUSES = [
+    { val: 'rejected', label: 'Just rejected — actively looking for help' },
+    { val: 'past', label: 'Rejected a while ago — still want to fight' },
+    { val: 'family', label: 'Helping a family member' },
+    { val: 'b2b', label: 'B2B / partner / hospital / broker' },
+    { val: 'researching', label: 'Just curious / researching the space' },
+  ];
+  const WL_STATE = { status: WL_STATUSES[0] };
+  const wlWrap = document.querySelector('.wl-select-wrap');
+  const wlBtn = wlWrap.querySelector('.wl-select');
+  const wlLabel = wlWrap.querySelector('.wl-sel-label');
+  const wlPanel = wlWrap.querySelector('.wl-select-panel');
+
+  wlPanel.innerHTML = WL_STATUSES.map((s, i) =>
+    `<div class="wl-select-opt ${i === 0 ? 'selected' : ''}" data-val="${s.val}">${s.label}</div>`
+  ).join('');
+
+  wlBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    wlWrap.classList.toggle('open');
+  });
+  wlPanel.querySelectorAll('.wl-select-opt').forEach(el => {
+    el.addEventListener('click', () => {
+      const chosen = WL_STATUSES.find(s => s.val === el.dataset.val);
+      WL_STATE.status = chosen;
+      wlLabel.textContent = chosen.label;
+      wlPanel.querySelectorAll('.wl-select-opt').forEach(x => x.classList.remove('selected'));
+      el.classList.add('selected');
+      wlWrap.classList.remove('open');
+    });
+  });
+
+  window.submitWaitlist = function(e) {
+    e.preventDefault();
+    const form = document.getElementById('wl-form');
+    const success = document.getElementById('wl-success');
+    form.querySelectorAll('.wl-field, .wl-submit-row').forEach(el => el.style.display = 'none');
+    success.classList.add('show');
+    // In production this would POST to a backend / mailing list
+    return false;
+  };
+
+  /* =============================================
+     FAQ ACCORDION
+     ============================================= */
+  document.querySelectorAll('.faq-q').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.parentElement.classList.toggle('open');
+    });
+  });
+</script>
+</body>
+</html>

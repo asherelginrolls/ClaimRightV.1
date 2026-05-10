@@ -22,7 +22,7 @@ export async function GET(
   { params }: { params: { caseId: string } },
 ): Promise<NextResponse<DownloadReadyResponse | DownloadPendingResponse | ApiError>> {
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
-  const { success } = rateLimit(`download:${ip}`, { maxRequests: 20, windowMs: 60_000 })
+  const { success } = await rateLimit(`download:${ip}`, { maxRequests: 20, windowMs: 60_000 })
   if (!success) {
     return NextResponse.json(
       { error: 'Too many requests. Please wait a minute before trying again.' },

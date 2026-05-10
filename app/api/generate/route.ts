@@ -33,7 +33,7 @@ export async function POST(
   request: NextRequest
 ): Promise<NextResponse<GenerateSuccessResponse | ApiError>> {
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
-  const { success } = rateLimit(`generate:${ip}`, { maxRequests: 3, windowMs: 300_000 })
+  const { success } = await rateLimit(`generate:${ip}`, { maxRequests: 3, windowMs: 300_000 })
   if (!success) {
     return NextResponse.json(
       { error: 'Too many requests. Please wait 5 minutes before trying again.' },

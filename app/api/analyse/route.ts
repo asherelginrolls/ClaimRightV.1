@@ -115,7 +115,7 @@ export async function GET(
   request: NextRequest
 ): Promise<NextResponse<AnalyseResponse | ApiError>> {
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
-  const { success } = rateLimit(`analyse:${ip}`, { maxRequests: 10, windowMs: 60_000 })
+  const { success } = await rateLimit(`analyse:${ip}`, { maxRequests: 10, windowMs: 60_000 })
   if (!success) {
     return NextResponse.json(
       { error: 'Too many requests. Please wait a minute before trying again.' },

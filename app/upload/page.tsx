@@ -1,9 +1,19 @@
 'use client'
 
-import { useRef, useState, ChangeEvent } from 'react'
+import { useRef, useState, useEffect, ChangeEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { DocType } from '@/types/case'
+
+declare global {
+  interface Window {
+    turnstile?: {
+      getResponse: (widgetId?: string) => string | undefined
+      render: (container: string | HTMLElement, options: Record<string, unknown>) => string
+      reset: (widgetId?: string) => void
+    }
+  }
+}
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -13,6 +23,7 @@ function formatBytes(bytes: number): string {
 
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png']
 const MAX_BYTES = 10 * 1024 * 1024
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
 
 interface SlotConfig {
   docType: DocType
@@ -175,12 +186,28 @@ function FileSlot({ config, file, slotError, onChange }: FileSlotProps) {
 
 export default function UploadPage() {
   const router = useRouter()
+  const turnstileContainerRef = useRef<HTMLDivElement>(null)
 
   const [files, setFiles] = useState<Partial<Record<DocType, File>>>({})
   const [slotErrors, setSlotErrors] = useState<Partial<Record<DocType, string>>>({})
   const [email, setEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
+  // Load Turnstile script once when site key is configured
+  useEffect(() => {
+    if (!TURNSTILE_SITE_KEY) return
+
+    const existing = document.getElementById('cf-turnstile-script')
+    if (existing) return
+
+    const script = document.createElement('script')
+    script.id = 'cf-turnstile-script'
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js'
+    script.async = true
+    script.defer = true
+    document.head.appendChild(script)
+  }, [])
 
   function handleSlotChange(docType: DocType, file: File | null, err: string | null) {
     setFiles(prev => {
@@ -214,6 +241,15 @@ export default function UploadPage() {
       return
     }
 
+    // Turnstile check — only enforced when site key is configured
+    if (TURNSTILE_SITE_KEY) {
+      const token = window.turnstile?.getResponse()
+      if (!token) {
+        setError('Please complete the security check.')
+        return
+      }
+    }
+
     setLoading(true)
     setError(null)
 
@@ -229,11 +265,18 @@ export default function UploadPage() {
         }
       }
 
+      // Attach Turnstile token if available
+      if (TURNSTILE_SITE_KEY) {
+        const token = window.turnstile?.getResponse() ?? ''
+        fd.append('turnstile_token', token)
+      }
+
       const res = await fetch('/api/upload', { method: 'POST', body: fd })
       const data = await res.json() as { caseId?: string; error?: string }
 
       if (!res.ok || !data.caseId) {
         setError(data.error ?? 'Upload failed. Please try again.')
+        window.turnstile?.reset()
         setLoading(false)
         return
       }
@@ -241,6 +284,7 @@ export default function UploadPage() {
       router.push(`/analysis/${data.caseId}`)
     } catch {
       setError('Upload failed. Please check your connection and try again.')
+      window.turnstile?.reset()
       setLoading(false)
     }
   }
@@ -334,6 +378,16 @@ export default function UploadPage() {
                 We&apos;ll send your dispute letter here after payment.
               </p>
             </div>
+
+            {/* Cloudflare Turnstile widget — hidden when site key not configured */}
+            {TURNSTILE_SITE_KEY && (
+              <div
+                ref={turnstileContainerRef}
+                className="cf-turnstile"
+                data-sitekey={TURNSTILE_SITE_KEY}
+                data-theme="light"
+              />
+            )}
 
             {/* Error */}
             {error && (

@@ -3,24 +3,11 @@ import { createServiceClient, type Database } from '@/lib/supabase'
 import { randomUUID } from 'crypto'
 import type { UploadResponse, ApiError } from '@/types/api'
 import type { DocType } from '@/types/case'
+import { rateLimitUpload } from '@/lib/rate-limit'
+import { verifyTurnstileToken } from '@/lib/turnstile'
 
 type CaseInsert = Database['public']['Tables']['cases']['Insert']
 type CaseDocInsert = Database['public']['Tables']['case_documents']['Insert']
-
-// Simple in-memory rate limiter — resets on cold start (intentional for MVP)
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now()
-  const entry = rateLimitMap.get(ip)
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + 60_000 })
-    return true
-  }
-  if (entry.count >= 5) return false
-  entry.count++
-  return true
-}
 
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png'])
 const ALLOWED_DOC_TYPES = new Set<DocType>([
@@ -58,11 +45,9 @@ export async function POST(
 ): Promise<NextResponse<UploadResponse | ApiError>> {
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
 
-  if (!checkRateLimit(ip)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait a minute before trying again.' },
-      { status: 429 }
-    )
+  const rateLimitResult = await rateLimitUpload(ip)
+  if (!rateLimitResult.success) {
+    return NextResponse.json({ error: rateLimitResult.reason ?? 'Too many requests.' }, { status: 429 })
   }
 
   try {
@@ -70,6 +55,7 @@ export async function POST(
     const email = formData.get('email') as string | null
     const files = formData.getAll('files') as File[]
     const docTypes = formData.getAll('doc_types') as string[]
+    const turnstileToken = formData.get('turnstile_token') as string | null
 
     if (files.length === 0) {
       return NextResponse.json({ error: 'No files uploaded.' }, { status: 400 })
@@ -93,7 +79,13 @@ export async function POST(
       return NextResponse.json({ error: 'A rejection letter is required.' }, { status: 400 })
     }
 
-    // Server-side email validation
+    // Verify Turnstile (skipped in dev when TURNSTILE_SECRET_KEY is unset)
+    const turnstileOk = await verifyTurnstileToken(turnstileToken ?? '')
+    if (!turnstileOk) {
+      return NextResponse.json({ error: 'Bot check failed. Please try again.' }, { status: 400 })
+    }
+
+    // Server-side email format validation
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json({ error: 'Please enter a valid email address.' }, { status: 400 })
     }
@@ -160,6 +152,7 @@ export async function POST(
       status: 'uploaded',
       document_path: rejectionLetterPath,
     }
+    // Type cast needed: supabase-js generic resolution issue with custom Database types
     const { error: caseError } = await (
       supabase.from('cases').insert as unknown as (
         values: CaseInsert

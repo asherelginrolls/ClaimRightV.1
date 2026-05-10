@@ -28,7 +28,7 @@ export async function POST(
   request: NextRequest,
 ): Promise<NextResponse<PaymentOrderResponse | ApiError>> {
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
-  const { success } = rateLimit(`payment:${ip}`, { maxRequests: 5, windowMs: 60_000 })
+  const { success } = await rateLimit(`payment:${ip}`, { maxRequests: 5, windowMs: 60_000 })
   if (!success) {
     return NextResponse.json(
       { error: 'Too many requests. Please wait a minute before trying again.' },
@@ -67,12 +67,17 @@ export async function POST(
   }
 
   try {
-    const order = await razorpay.orders.create({
-      amount: 9900,
-      currency: 'INR',
-      receipt: caseId.slice(0, 40),
-      notes: { caseId },
-    })
+    const order = await Promise.race([
+      razorpay.orders.create({
+        amount: 9900,
+        currency: 'INR',
+        receipt: caseId.slice(0, 40),
+        notes: { caseId },
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Razorpay order creation timed out')), 15_000),
+      ),
+    ])
 
     await typedUpdate(supabase, { razorpay_order_id: order.id }).eq('id', caseId)
 

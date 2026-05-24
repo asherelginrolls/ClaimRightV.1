@@ -1,49 +1,44 @@
 import type { ExtractedFacts } from '@/types/api'
 import type { RetrievalResult } from '@/lib/retrieval'
-import type { FightabilityScore, FightabilityReason, RejectionCategory } from '@/types/case'
+import type { FightabilityScore, FightabilityReason } from '@/types/case'
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max)
 }
 
 /**
- * Compute a numeric fightability score (0–100) per CLAUDE_PART2 §3.
- * policyAgeMonths is required to apply the pre_existing_condition_post_60mo bonus.
+ * Compute a numeric fightability score (0–100) that is always consistent with
+ * the text band from calculateFightabilityScore.
+ *
+ * Band ranges:
+ *   strong  → 65–95  (center 80)
+ *   medium  → 40–64  (center 52)
+ *   low     → 5–39   (center 22)
+ *
+ * Retrieval quality (topScore) refines the position within the band.
+ * When there are no KB chunks, the score sits at the bottom of the band.
  */
 export function computeNumericScore(
   retrieval: RetrievalResult,
-  category: RejectionCategory,
-  policyAgeMonths: number | null = null
+  textBand: FightabilityScore = 'low'
 ): number {
-  const base = Math.floor(retrieval.topScore * 100)
+  const [bandMin, bandCenter, bandMax] =
+    textBand === 'strong' ? [65, 80, 95] :
+    textBand === 'medium' ? [40, 52, 64] :
+                            [5,  22, 39]
 
-  const categoryBonusMap: Record<string, number> = {
-    documentation_incomplete: 20,
-    cashless_denial: 18,
-    experimental_treatment: 8,
-    waiting_period: 12,
-    other: 0,
-    policy_exclusion: 0,
-    non_disclosure: 0,
-    fraud_suspected: 0,
-    pre_existing_condition: 0,
-  }
+  // retrievalQuality: -1 (no chunks) → +1 (topScore = 1.0)
+  // Normalised over the meaningful 0.65–1.0 range; below 0.65 treated as –1.
+  const topScore = retrieval.topScore
+  const retrievalQuality =
+    topScore > 0
+      ? clamp((topScore - 0.65) / 0.35, -1, 1)
+      : -1
 
-  let categoryBonus = categoryBonusMap[category] ?? 0
-
-  // pre_existing_condition_post_60mo: only applies if moratorium passed
-  if (category === 'pre_existing_condition' && policyAgeMonths !== null && policyAgeMonths >= 60) {
-    categoryBonus = 15
-  }
-
-  // Cap bonus at +20
-  categoryBonus = Math.min(categoryBonus, 20)
-
-  let penalty = 0
-  if (category === 'fraud_suspected') penalty -= 40
-  if (retrieval.chunks.length === 0) penalty -= 10 // kb_miss_count > 0
-
-  return clamp(base + categoryBonus + penalty, 5, 95)
+  // Shift the center by up to 70% of the half-band width in each direction.
+  const halfRange = bandMax - bandCenter
+  const score = bandCenter + Math.round(retrievalQuality * halfRange * 0.7)
+  return clamp(score, bandMin, bandMax)
 }
 
 function buildCitation(chunk: { source_title: string; section_number: string | null }): string {

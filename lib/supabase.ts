@@ -11,7 +11,7 @@ export type Database = {
           id: string
           created_at: string
           email: string | null
-          status: 'uploaded' | 'analysed' | 'paid' | 'generated' | 'delivered'
+          status: 'uploaded' | 'analysed' | 'paid' | 'generating' | 'generated' | 'delivered'
           insurer: string | null
           claim_amount: number | null
           rejection_reason_raw: string | null
@@ -42,7 +42,7 @@ export type Database = {
           id?: string
           created_at?: string
           email?: string | null
-          status?: 'uploaded' | 'analysed' | 'paid' | 'generated' | 'delivered'
+          status?: 'uploaded' | 'analysed' | 'paid' | 'generating' | 'generated' | 'delivered'
           insurer?: string | null
           claim_amount?: number | null
           rejection_reason_raw?: string | null
@@ -73,7 +73,7 @@ export type Database = {
           id?: string
           created_at?: string
           email?: string | null
-          status?: 'uploaded' | 'analysed' | 'paid' | 'generated' | 'delivered'
+          status?: 'uploaded' | 'analysed' | 'paid' | 'generating' | 'generated' | 'delivered'
           insurer?: string | null
           claim_amount?: number | null
           rejection_reason_raw?: string | null

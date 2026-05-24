@@ -62,6 +62,8 @@ export async function retrieveForCase(extractedFacts: {
   rejectionReasonRaw: string | null
   rejectionReasonCategory: string | null
   claimAmount: number | null
+  policyAgeMonths?: number | null
+  primaryDiagnosis?: string | null
 }): Promise<RetrievalResult> {
   const queryParts = [
     extractedFacts.rejectionReasonRaw,
@@ -69,6 +71,10 @@ export async function retrieveForCase(extractedFacts: {
     extractedFacts.rejectionReasonCategory
       ? `rejection category: ${extractedFacts.rejectionReasonCategory.replace(/_/g, ' ')}`
       : null,
+    extractedFacts.policyAgeMonths != null
+      ? `policy age ${extractedFacts.policyAgeMonths} months${extractedFacts.policyAgeMonths >= 60 ? ' (moratorium passed)' : ''}`
+      : null,
+    extractedFacts.primaryDiagnosis ? `diagnosis: ${extractedFacts.primaryDiagnosis}` : null,
     'IRDAI regulation health insurance India',
   ].filter((p): p is string => p !== null)
 

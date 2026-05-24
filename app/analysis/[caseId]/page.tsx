@@ -133,23 +133,38 @@ export default function AnalysisPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    const controller = new AbortController()
+    // Client-side ceiling slightly under the 60s Vercel maxDuration so a
+    // truly-stuck request surfaces as an actionable error instead of an
+    // indefinite spinner.
+    const timeout = setTimeout(() => controller.abort(), 55_000)
+
     async function fetchAnalysis() {
       try {
-        const res = await fetch(`/api/analyse?caseId=${caseId}`)
-        const data = await res.json() as AnalyseResponse & { error?: string }
+        const res = await fetch(`/api/analyse?caseId=${caseId}`, { signal: controller.signal })
+        const data = (await res.json()) as AnalyseResponse & { error?: string }
         if (!res.ok || data.error) {
           setError(data.error ?? 'Analysis failed. Please try again.')
         } else {
           setResult(data)
         }
-      } catch {
-        setError('Could not reach the server. Please check your connection.')
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          setError('Analysis is taking longer than expected. Refresh this page to try again.')
+        } else {
+          setError('Could not reach the server. Please check your connection.')
+        }
       } finally {
+        clearTimeout(timeout)
         setLoading(false)
       }
     }
 
     if (caseId) fetchAnalysis()
+    return () => {
+      clearTimeout(timeout)
+      controller.abort()
+    }
   }, [caseId])
 
   return (
@@ -168,6 +183,9 @@ function ResultView({ result, caseId }: { result: AnalyseResponse; caseId: strin
   const evidenceSummaries = result.evidenceSummaries ?? []
   const regulationCount = result.regulationMatchCount ?? evidenceSummaries.filter((e) => e.tier === 1).length
   const precedentCount = result.precedentMatchCount ?? evidenceSummaries.filter((e) => e.tier === 2).length
+  const pointByPoint = result.pointByPointAnalysis ?? []
+  const visibleBullets = pointByPoint.slice(0, 3)
+  const blurredBullets = pointByPoint.slice(3, 6)
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -269,8 +287,29 @@ function ResultView({ result, caseId }: { result: AnalyseResponse; caseId: strin
         </div>
       )}
 
-      {/* ── 4. Blurred preview block ──────────────────────────────────────── */}
-      <div className="mt-8 relative overflow-hidden rounded-2xl border border-rule">
+      {/* ── 4a. Visible teaser bullets (first 3 of point-by-point) ────────── */}
+      {visibleBullets.length > 0 && (
+        <div className="mt-8">
+          <p className="font-mono text-[10px] tracking-widest text-ink/40 uppercase mb-4">
+            What we found in your case
+          </p>
+          <div className="flex flex-col gap-3">
+            {visibleBullets.map((line, i) => (
+              <div key={i} className="rounded-xl border border-forest/20 bg-forest/5 px-5 py-4">
+                <div className="flex items-start gap-3">
+                  <span className="font-mono text-[11px] font-semibold text-forest leading-relaxed mt-0.5">
+                    {i + 1}.
+                  </span>
+                  <p className="flex-1 font-sans text-sm text-ink leading-relaxed">{line}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── 4b. Blurred preview block (remaining bullets + letter preview) ── */}
+      <div className="mt-6 relative overflow-hidden rounded-2xl border border-rule">
         {/* Blurred content underneath */}
         <div
           className="pointer-events-none select-none px-6 py-6"
@@ -278,14 +317,24 @@ function ResultView({ result, caseId }: { result: AnalyseResponse; caseId: strin
           aria-hidden="true"
         >
           <p className="font-mono text-[10px] tracking-widest text-ink/40 uppercase mb-3">
-            Full point-by-point regulation analysis
+            Continued point-by-point analysis
           </p>
           <div className="flex flex-col gap-2 mb-5">
-            {['Your insurer violated §5.3 — cashless pre-authorization must be granted within 1 hour.',
-              'GRO response due within 15 days of this complaint letter.',
-              'Ombudsman win-rate for documentation rejections: 78% in FY2024.'].map((line, i) => (
+            {(blurredBullets.length > 0
+              ? blurredBullets
+              : [
+                  'Your insurer violated procedural deadlines under the IRDAI Master Circular on Health Insurance.',
+                  'A complaint to the Grievance Redressal Officer must be filed within 15 days under PPOI rules.',
+                  'Ombudsman precedents support reversal of rejections of this category in FY2024.',
+                ]
+            ).map((line, i) => (
               <div key={i} className="rounded-lg bg-rule/60 px-4 py-3">
-                <p className="font-sans text-sm text-ink">{line}</p>
+                <p className="font-sans text-sm text-ink">
+                  <span className="font-mono text-[11px] font-semibold mr-2">
+                    {visibleBullets.length + i + 1}.
+                  </span>
+                  {line}
+                </p>
               </div>
             ))}
           </div>

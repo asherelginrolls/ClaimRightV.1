@@ -1,15 +1,11 @@
-import { sarvamOcr } from '@/lib/sarvam'
 import { haiku } from '@/lib/claude'
 
-// Unicode ranges for major Indian scripts
-const INDIAN_SCRIPT_REGEX =
-  /[ऀ-ॿঀ-৿਀-੿઀-૿଀-୿஀-௿ఀ-౿ಀ-೿ഀ-ൿ]/
-
-function hasIndianScript(buffer: Buffer): boolean {
-  // Sample the first 5000 bytes as UTF-8 text
-  const sample = buffer.toString('utf8', 0, Math.min(5000, buffer.length))
-  return INDIAN_SCRIPT_REGEX.test(sample)
-}
+// NOTE: Sarvam Vision routing was removed for both PDFs and images.
+// Reading raw binary (PDF streams or JPEG/PNG bytes) as UTF-8 and matching
+// against Devanagari Unicode ranges yields essentially random results, so the
+// branch was firing inconsistently and producing 30s Sarvam timeouts in
+// production. Claude Haiku Vision handles English + Indian-script documents
+// natively for both PDFs and images.
 
 export async function extractTextFromDocument(
   fileBuffer: Buffer,
@@ -17,19 +13,6 @@ export async function extractTextFromDocument(
 ): Promise<string> {
   const base64 = fileBuffer.toString('base64')
 
-  if (hasIndianScript(fileBuffer)) {
-    try {
-      return await sarvamOcr(
-        base64,
-        mimeType as 'image/jpeg' | 'image/png' | 'application/pdf'
-      )
-    } catch (err) {
-      // Sarvam failed — fall through to Claude Haiku as safety net
-      console.warn('[ocr] Sarvam OCR failed, falling back to Claude Haiku:', err)
-    }
-  }
-
-  // Claude Haiku Vision for English documents (and Sarvam fallback)
   if (mimeType === 'application/pdf') {
     // PDFs: use Claude's native document support
     const message = await haiku.messages.create({

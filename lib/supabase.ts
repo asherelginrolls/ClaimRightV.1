@@ -31,6 +31,7 @@ export type Database = {
           fightability_reasons: Array<{ reason: string; citation: string | null }> | null
           fightability_numeric: number | null
           evidence_summaries: Array<{ source_title: string; section_number: string | null; tier: number; similarity: number; explainer: string }> | null
+          point_by_point_analysis: string[] | null
           document_path: string | null
           letter_path: string | null
           razorpay_order_id: string | null
@@ -61,6 +62,7 @@ export type Database = {
           fightability_reasons?: Array<{ reason: string; citation: string | null }> | null
           fightability_numeric?: number | null
           evidence_summaries?: Array<{ source_title: string; section_number: string | null; tier: number; similarity: number; explainer: string }> | null
+          point_by_point_analysis?: string[] | null
           document_path?: string | null
           letter_path?: string | null
           razorpay_order_id?: string | null
@@ -91,6 +93,7 @@ export type Database = {
           fightability_reasons?: Array<{ reason: string; citation: string | null }> | null
           fightability_numeric?: number | null
           evidence_summaries?: Array<{ source_title: string; section_number: string | null; tier: number; similarity: number; explainer: string }> | null
+          point_by_point_analysis?: string[] | null
           document_path?: string | null
           letter_path?: string | null
           razorpay_order_id?: string | null
@@ -112,6 +115,7 @@ export type Database = {
             | 'other'
           storage_path: string
           ocr_text: string | null
+          extracted_facts: Record<string, unknown> | null
           uploaded_at: string
         }
         Insert: {
@@ -126,6 +130,7 @@ export type Database = {
             | 'other'
           storage_path: string
           ocr_text?: string | null
+          extracted_facts?: Record<string, unknown> | null
           uploaded_at?: string
         }
         Update: {
@@ -140,6 +145,7 @@ export type Database = {
             | 'other'
           storage_path?: string
           ocr_text?: string | null
+          extracted_facts?: Record<string, unknown> | null
           uploaded_at?: string
         }
       }

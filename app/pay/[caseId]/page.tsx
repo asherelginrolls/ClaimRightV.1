@@ -35,6 +35,7 @@ declare global {
 }
 
 const WHAT_YOU_GET = [
+  'Full point-by-point regulation analysis specific to your rejection',
   'Formal GRO complaint letter citing your insurer\'s specific IRDAI violations',
   'Exact regulation clauses (IRDAI circular sections) that apply to your case',
   'Step-by-step escalation path: GRO → IGMS → Insurance Ombudsman',
@@ -104,7 +105,7 @@ export default function PayPage() {
         amount: orderData.amount,
         currency: orderData.currency,
         name: 'ClaimRight',
-        description: 'Health Insurance Dispute Letter',
+        description: 'Full Analysis + Dispute Letter',
         order_id: orderData.orderId,
         prefill: { email },
         theme: { color: '#1F3B2A' },
@@ -159,11 +160,11 @@ export default function PayPage() {
             One-time · No subscription
           </p>
           <h1 className="font-serif text-3xl font-semibold text-ink">
-            Your IRDAI-Backed Dispute Letter
+            Full Analysis + Formal Dispute Letter
           </h1>
           <p className="mt-3 font-sans text-sm text-ink/60 leading-relaxed">
-            Every citation in your letter traces to a real, verified IRDAI regulation
-            or ombudsman precedent. No fabrication. Ever.
+            Every citation traces to a real, verified IRDAI regulation or ombudsman
+            precedent. No fabrication. Ever.
           </p>
         </div>
 
@@ -202,7 +203,7 @@ export default function PayPage() {
             disabled={loading || !scriptLoaded}
             className="w-full rounded-xl bg-forest px-6 py-4 font-sans text-base font-semibold text-white shadow-md hover:bg-forest/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {loading ? 'Processing…' : 'Pay ₹99 — Get Your Dispute Letter'}
+            {loading ? 'Processing…' : 'Pay ₹99 — Get Full Analysis + Dispute Letter'}
           </button>
 
           <p className="mt-4 text-center font-mono text-[10px] tracking-wide text-ink/40">

@@ -135,7 +135,7 @@ export default function HomePage() {
             Find out if your rejection is worth fighting
           </h2>
           <p className="mt-3 font-sans text-sm text-ink/60">
-            Free analysis. ₹99 only if you want the dispute letter.
+            Free analysis. ₹99 only if you want the full analysis + dispute letter.
           </p>
           <Link
             href="/upload"

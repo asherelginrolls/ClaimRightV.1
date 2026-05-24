@@ -1,6 +1,50 @@
 import type { ExtractedFacts } from '@/types/api'
 import type { RetrievalResult } from '@/lib/retrieval'
-import type { FightabilityScore, FightabilityReason } from '@/types/case'
+import type { FightabilityScore, FightabilityReason, RejectionCategory } from '@/types/case'
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max)
+}
+
+/**
+ * Compute a numeric fightability score (0–100) per CLAUDE_PART2 §3.
+ * policyAgeMonths is required to apply the pre_existing_condition_post_60mo bonus.
+ */
+export function computeNumericScore(
+  retrieval: RetrievalResult,
+  category: RejectionCategory,
+  policyAgeMonths: number | null = null
+): number {
+  const base = Math.floor(retrieval.topScore * 100)
+
+  const categoryBonusMap: Record<string, number> = {
+    documentation_incomplete: 20,
+    cashless_denial: 18,
+    experimental_treatment: 8,
+    waiting_period: 12,
+    other: 0,
+    policy_exclusion: 0,
+    non_disclosure: 0,
+    fraud_suspected: 0,
+    pre_existing_condition: 0,
+  }
+
+  let categoryBonus = categoryBonusMap[category] ?? 0
+
+  // pre_existing_condition_post_60mo: only applies if moratorium passed
+  if (category === 'pre_existing_condition' && policyAgeMonths !== null && policyAgeMonths >= 60) {
+    categoryBonus = 15
+  }
+
+  // Cap bonus at +20
+  categoryBonus = Math.min(categoryBonus, 20)
+
+  let penalty = 0
+  if (category === 'fraud_suspected') penalty -= 40
+  if (retrieval.chunks.length === 0) penalty -= 10 // kb_miss_count > 0
+
+  return clamp(base + categoryBonus + penalty, 5, 95)
+}
 
 function buildCitation(chunk: { source_title: string; section_number: string | null }): string {
   return chunk.section_number

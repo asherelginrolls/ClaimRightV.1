@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { FightabilityScore, RejectionCategory } from './case'
+import type { FightabilityScore, RejectionCategory, EvidenceSummary } from './case'
 
 export interface ApiError {
   error: string
@@ -18,6 +18,10 @@ export interface AnalyseResponse {
   rejectionReasonCategory: RejectionCategory | null
   fightabilityScore: FightabilityScore
   fightabilityReasons: Array<{ reason: string; citation: string | null }>
+  fightabilityNumeric: number
+  evidenceSummaries: EvidenceSummary[]
+  regulationMatchCount: number
+  precedentMatchCount: number
 }
 
 export interface PaymentOrderResponse {

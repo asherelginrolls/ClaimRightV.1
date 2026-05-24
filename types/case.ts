@@ -35,6 +35,14 @@ export interface FightabilityReason {
   citation: string | null
 }
 
+export interface EvidenceSummary {
+  source_title: string
+  section_number: string | null
+  tier: number
+  similarity: number
+  explainer: string
+}
+
 export interface Case {
   id: string
   created_at: string
@@ -47,6 +55,8 @@ export interface Case {
   rejection_date: string | null
   fightability_score: FightabilityScore | null
   fightability_reasons: FightabilityReason[] | null
+  fightability_numeric: number | null
+  evidence_summaries: EvidenceSummary[] | null
   document_path: string | null
   letter_path: string | null
   razorpay_order_id: string | null

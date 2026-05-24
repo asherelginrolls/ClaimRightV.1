@@ -29,6 +29,8 @@ export type Database = {
           rejection_date: string | null
           fightability_score: 'low' | 'medium' | 'strong' | null
           fightability_reasons: Array<{ reason: string; citation: string | null }> | null
+          fightability_numeric: number | null
+          evidence_summaries: Array<{ source_title: string; section_number: string | null; tier: number; similarity: number; explainer: string }> | null
           document_path: string | null
           letter_path: string | null
           razorpay_order_id: string | null
@@ -57,6 +59,8 @@ export type Database = {
           rejection_date?: string | null
           fightability_score?: 'low' | 'medium' | 'strong' | null
           fightability_reasons?: Array<{ reason: string; citation: string | null }> | null
+          fightability_numeric?: number | null
+          evidence_summaries?: Array<{ source_title: string; section_number: string | null; tier: number; similarity: number; explainer: string }> | null
           document_path?: string | null
           letter_path?: string | null
           razorpay_order_id?: string | null
@@ -85,6 +89,8 @@ export type Database = {
           rejection_date?: string | null
           fightability_score?: 'low' | 'medium' | 'strong' | null
           fightability_reasons?: Array<{ reason: string; citation: string | null }> | null
+          fightability_numeric?: number | null
+          evidence_summaries?: Array<{ source_title: string; section_number: string | null; tier: number; similarity: number; explainer: string }> | null
           document_path?: string | null
           letter_path?: string | null
           razorpay_order_id?: string | null

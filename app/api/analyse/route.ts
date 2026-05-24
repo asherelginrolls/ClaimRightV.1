@@ -4,10 +4,10 @@ import { extractTextFromDocument } from '@/lib/ocr'
 import { haiku } from '@/lib/claude'
 import { EXTRACTION_SYSTEM_PROMPT, EXTRACTION_USER_PROMPT } from '@/prompts/extraction'
 import { retrieveForCase } from '@/lib/retrieval'
-import { calculateFightabilityScore } from '@/lib/scoring'
+import { calculateFightabilityScore, computeNumericScore } from '@/lib/scoring'
 import { ExtractedFactsSchema } from '@/types/api'
 import type { AnalyseResponse, ApiError } from '@/types/api'
-import type { RejectionCategory } from '@/types/case'
+import type { RejectionCategory, EvidenceSummary } from '@/types/case'
 import { rateLimit } from '@/lib/rate-limit'
 
 type CaseRow = Database['public']['Tables']['cases']['Row']
@@ -147,6 +147,10 @@ export async function GET(
 
     // Return cached result if already analysed
     if (caseRow.status !== 'uploaded') {
+      const cached = caseRow as typeof caseRow & {
+        fightability_numeric: number | null
+        evidence_summaries: EvidenceSummary[] | null
+      }
       return NextResponse.json({
         caseId,
         insurer: caseRow.insurer,
@@ -154,6 +158,10 @@ export async function GET(
         rejectionReasonCategory: caseRow.rejection_reason_category as RejectionCategory | null,
         fightabilityScore: caseRow.fightability_score ?? 'low',
         fightabilityReasons: caseRow.fightability_reasons ?? [],
+        fightabilityNumeric: cached.fightability_numeric ?? 40,
+        evidenceSummaries: cached.evidence_summaries ?? [],
+        regulationMatchCount: (cached.evidence_summaries ?? []).filter((e) => e.tier === 1).length,
+        precedentMatchCount: (cached.evidence_summaries ?? []).filter((e) => e.tier === 2).length,
       })
     }
 
@@ -182,6 +190,10 @@ export async function GET(
         rejectionReasonCategory: 'other',
         fightabilityScore: 'low',
         fightabilityReasons: [{ reason: 'Could not extract enough text from your document. Please ensure the file is clear and readable.', citation: null }],
+        fightabilityNumeric: 5,
+        evidenceSummaries: [],
+        regulationMatchCount: 0,
+        precedentMatchCount: 0,
       })
     }
 
@@ -259,6 +271,10 @@ export async function GET(
         rejectionReasonCategory: 'other' as RejectionCategory,
         fightabilityScore: 'medium' as const,
         fightabilityReasons: claudeFallbackReasons,
+        fightabilityNumeric: 40,
+        evidenceSummaries: [],
+        regulationMatchCount: 0,
+        precedentMatchCount: 0,
       })
     }
 
@@ -286,13 +302,73 @@ export async function GET(
 
     // Fightability scoring
     const { score, reasons } = calculateFightabilityScore(extractedFacts, retrievalResult)
+    const numericScore = computeNumericScore(
+      retrievalResult,
+      extractedFacts.rejection_reason_category,
+      extractedFacts.policy_age_months
+    )
+
+    // Generate plain-English evidence explainers for top-3 chunks (single Haiku call)
+    let evidenceSummaries: EvidenceSummary[] = []
+    if (retrievalResult.chunks.length > 0) {
+      try {
+        const chunksForExplainer = retrievalResult.chunks.slice(0, 3)
+        const explainerPrompt = chunksForExplainer
+          .map(
+            (c, i) =>
+              `Chunk ${i + 1} — "${c.source_title}${c.section_number ? ` §${c.section_number}` : ''}":\n${c.content.slice(0, 600)}`
+          )
+          .join('\n\n---\n\n')
+
+        const explainerMsg = await haiku.messages.create({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 300,
+          system:
+            'You are a plain-English summariser for Indian insurance regulations. For each numbered chunk below, write exactly one sentence (under 20 words) explaining what rule it contains and why it matters to a policyholder. Respond with a JSON array of strings only, e.g. ["sentence 1","sentence 2"]. No other text.',
+          messages: [{ role: 'user', content: explainerPrompt }],
+        })
+
+        const rawExplainers =
+          explainerMsg.content[0]?.type === 'text' ? explainerMsg.content[0].text.trim() : '[]'
+        const cleanExplainers = rawExplainers
+          .replace(/```json\n?/g, '')
+          .replace(/```/g, '')
+          .trim()
+
+        let explainerArr: string[] = []
+        try {
+          const parsed = JSON.parse(cleanExplainers)
+          if (Array.isArray(parsed)) explainerArr = parsed.map(String)
+        } catch {
+          // ignore — leave evidenceSummaries empty
+        }
+
+        evidenceSummaries = chunksForExplainer.map((c, i) => ({
+          source_title: c.source_title,
+          section_number: c.section_number,
+          tier: c.tier,
+          similarity: c.similarity,
+          explainer: explainerArr[i] ?? `Relevant regulation from ${c.source_title}.`,
+        }))
+      } catch (explainerErr) {
+        console.error('[analyse] Evidence explainer call failed:', explainerErr instanceof Error ? explainerErr.message : String(explainerErr))
+        // Non-fatal — proceed with empty summaries
+        evidenceSummaries = retrievalResult.chunks.slice(0, 3).map((c) => ({
+          source_title: c.source_title,
+          section_number: c.section_number,
+          tier: c.tier,
+          similarity: c.similarity,
+          explainer: `Relevant regulation from ${c.source_title}.`,
+        }))
+      }
+    }
 
     // claim_amount: extraction returns rupees → convert to paise for storage
     const claimAmountPaise =
       extractedFacts.claim_amount !== null ? extractedFacts.claim_amount * 100 : null
 
-    await typedUpdate(supabase, {
-      status: 'analysed',
+    const updatePayload = {
+      status: 'analysed' as const,
       insurer: extractedFacts.insurer,
       claim_amount: claimAmountPaise,
       rejection_reason_raw: extractedFacts.rejection_reason_raw,
@@ -300,7 +376,14 @@ export async function GET(
       rejection_date: extractedFacts.rejection_date,
       fightability_score: score,
       fightability_reasons: reasons,
-    }).eq('id', caseId)
+      fightability_numeric: numericScore,
+      evidence_summaries: evidenceSummaries,
+    }
+
+    await typedUpdate(supabase, updatePayload).eq('id', caseId)
+
+    const regulationMatchCount = evidenceSummaries.filter((e) => e.tier === 1).length
+    const precedentMatchCount = evidenceSummaries.filter((e) => e.tier === 2).length
 
     return NextResponse.json({
       caseId,
@@ -310,6 +393,10 @@ export async function GET(
       rejectionReasonCategory: extractedFacts.rejection_reason_category,
       fightabilityScore: score,
       fightabilityReasons: reasons,
+      fightabilityNumeric: numericScore,
+      evidenceSummaries,
+      regulationMatchCount,
+      precedentMatchCount,
     })
   } catch (error) {
     console.error('[analyse] Error:', error instanceof Error ? error.message : String(error))

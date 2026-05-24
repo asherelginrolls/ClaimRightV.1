@@ -22,6 +22,9 @@ export interface AnalyseResponse {
   evidenceSummaries: EvidenceSummary[]
   regulationMatchCount: number
   precedentMatchCount: number
+  // 6 case-specific sentences. First 2-3 shown unblurred above the paywall,
+  // rest rendered inside the blur block. Empty array if LLM call failed.
+  pointByPointAnalysis: string[]
 }
 
 export interface PaymentOrderResponse {

@@ -53,16 +53,19 @@ async function buildCombinedDocumentText(
   )
 
   if (docs && docs.length > 0) {
-    // OCR each document in parallel, store ocr_text back to DB
-    const ocrResults = await Promise.all(
-      docs.map(async (doc) => {
+    // OCR each document SEQUENTIALLY to avoid Anthropic token rate limits.
+    // Parallel OCR of 5 large PDFs can spike >50K input tokens/min (free-tier limit).
+    const ocrResults: Array<{ doc: CaseDocRow; text: string }> = []
+    for (const doc of docs) {
+      try {
         const { data: fileData, error: fileError } = await supabase.storage
           .from('documents')
           .download(doc.storage_path)
 
         if (fileError || !fileData) {
           console.warn(`[analyse] Could not download ${doc.doc_type} (${doc.storage_path})`)
-          return { doc, text: '' }
+          ocrResults.push({ doc, text: '' })
+          continue
         }
 
         const buffer = Buffer.from(await fileData.arrayBuffer())
@@ -79,9 +82,12 @@ async function buildCombinedDocumentText(
           ) => { eq: (col: string, val: string) => Promise<{ error: unknown }> }
         )({ ocr_text: text }).eq('id', doc.id)
 
-        return { doc, text }
-      })
-    )
+        ocrResults.push({ doc, text })
+      } catch (ocrErr) {
+        console.warn(`[analyse] OCR failed for ${doc.doc_type}:`, ocrErr instanceof Error ? ocrErr.message : String(ocrErr))
+        ocrResults.push({ doc, text: '' })
+      }
+    }
 
     // Concatenate with doc-type headers; skip empty results
     const sections = ocrResults

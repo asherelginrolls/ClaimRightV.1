@@ -405,27 +405,43 @@ export async function GET(
 
     const caseRow = rawCase as CaseRow
 
-    // Return cached result if already analysed
+    // Return cached result if already analysed — but only if the cache is
+    // complete. Cases analysed before migration 005 (point_by_point_analysis)
+    // will have a null field; reset them to 'uploaded' so they re-run the
+    // full pipeline on this call rather than serving empty bullets forever.
     if (caseRow.status !== 'uploaded') {
-      console.info('[analyse] stage: cached-return status=' + caseRow.status)
+      console.info('[analyse] stage: cached-check status=' + caseRow.status)
       const cached = caseRow as typeof caseRow & {
         fightability_numeric: number | null
         evidence_summaries: EvidenceSummary[] | null
         point_by_point_analysis: string[] | null
       }
-      return NextResponse.json({
-        caseId,
-        insurer: caseRow.insurer,
-        claimAmount: caseRow.claim_amount,
-        rejectionReasonCategory: caseRow.rejection_reason_category as RejectionCategory | null,
-        fightabilityScore: caseRow.fightability_score ?? 'low',
-        fightabilityReasons: caseRow.fightability_reasons ?? [],
-        fightabilityNumeric: cached.fightability_numeric ?? 40,
-        evidenceSummaries: cached.evidence_summaries ?? [],
-        regulationMatchCount: (cached.evidence_summaries ?? []).filter((e) => e.tier === 1).length,
-        precedentMatchCount: (cached.evidence_summaries ?? []).filter((e) => e.tier === 2).length,
-        pointByPointAnalysis: cached.point_by_point_analysis ?? [],
-      })
+
+      const hasPointByPoint =
+        Array.isArray(cached.point_by_point_analysis) &&
+        (cached.point_by_point_analysis as string[]).length > 0
+
+      if (!hasPointByPoint && caseRow.status === 'analysed') {
+        // Stale cache — reset so the full pipeline re-runs below
+        console.info('[analyse] stage: stale-cache-reset (missing point_by_point_analysis)')
+        await typedUpdate(supabase, { status: 'uploaded' }).eq('id', caseId)
+        // Fall through to full re-analysis
+      } else {
+        console.info('[analyse] stage: cached-return status=' + caseRow.status)
+        return NextResponse.json({
+          caseId,
+          insurer: caseRow.insurer,
+          claimAmount: caseRow.claim_amount,
+          rejectionReasonCategory: caseRow.rejection_reason_category as RejectionCategory | null,
+          fightabilityScore: caseRow.fightability_score ?? 'low',
+          fightabilityReasons: caseRow.fightability_reasons ?? [],
+          fightabilityNumeric: cached.fightability_numeric ?? 40,
+          evidenceSummaries: cached.evidence_summaries ?? [],
+          regulationMatchCount: (cached.evidence_summaries ?? []).filter((e) => e.tier === 1).length,
+          precedentMatchCount: (cached.evidence_summaries ?? []).filter((e) => e.tier === 2).length,
+          pointByPointAnalysis: cached.point_by_point_analysis ?? [],
+        })
+      }
     }
 
     // ── 1. OCR the rejection letter (returns full doc list too) ───────────
@@ -619,7 +635,8 @@ export async function GET(
     const numericScore = computeNumericScore(
       retrievalResult,
       extractedFacts.rejection_reason_category,
-      derivedPolicyAge
+      derivedPolicyAge,
+      score
     )
     console.info('[analyse] stage: scoring-done score=' + score + ' numeric=' + numericScore)
 

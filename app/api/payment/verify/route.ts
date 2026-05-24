@@ -1,9 +1,6 @@
 import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient, type Database } from '@/lib/supabase'
-import { generateDisputeLetter } from '@/lib/generation'
-import { generatePdf } from '@/lib/pdf'
-import { sendDisputeLetterEmail } from '@/lib/email'
 import type { ApiError } from '@/types/api'
 import { rateLimit } from '@/lib/rate-limit'
 
@@ -12,7 +9,6 @@ type CaseUpdate = Database['public']['Tables']['cases']['Update']
 type SupabaseClient = ReturnType<typeof createServiceClient>
 
 // Type cast required: supabase-js generic resolution issue with custom Database types
-// (same pattern as app/api/generate/route.ts)
 type UpdateQuery = {
   eq: (column: string, value: string) => Promise<{ error: { message: string } | null }>
 }
@@ -80,56 +76,8 @@ export async function POST(
     paid_at: new Date().toISOString(),
   }).eq('id', caseRow.id)
 
-  // Fire-and-forget: generate + deliver in background (client polls /api/download/[caseId])
-  // 120s timeout: generous for Sonnet generation; prevents case staying 'paid' forever if hung
-  const DELIVERY_TIMEOUT_MS = 120_000
-  const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(
-      () => reject(new Error('generateAndDeliver timed out after 120s')),
-      DELIVERY_TIMEOUT_MS,
-    ),
-  )
-  Promise.race([generateAndDeliver(caseRow.id, supabase), timeoutPromise]).catch((err: unknown) =>
-    console.error(
-      '[payment/verify] Delivery error for',
-      caseRow.id,
-      ':',
-      err instanceof Error ? err.message : String(err),
-    ),
-  )
-
+  // Generation happens lazily when the client polls /api/download/[caseId].
+  // Fire-and-forget is avoided because Vercel kills serverless functions once
+  // the response is sent, which caused generation to silently fail.
   return NextResponse.json({ success: true, caseId: caseRow.id })
-}
-
-async function generateAndDeliver(caseId: string, supabase: SupabaseClient): Promise<void> {
-  const letterResult = await generateDisputeLetter(caseId)
-  const pdfBuffer = await generatePdf(letterResult)
-
-  const pdfPath = `${caseId}/dispute-letter.pdf`
-  const { error: uploadError } = await supabase.storage
-    .from('documents')
-    .upload(pdfPath, pdfBuffer, { contentType: 'application/pdf', upsert: true })
-
-  if (uploadError) {
-    throw new Error(`Storage upload failed: ${uploadError.message}`)
-  }
-
-  await typedUpdate(supabase, { status: 'generated', letter_path: pdfPath }).eq('id', caseId)
-
-  const { data: urlData } = await supabase.storage
-    .from('documents')
-    .createSignedUrl(pdfPath, 60 * 60 * 24)
-
-  const { data: rawCaseRow } = await supabase
-    .from('cases')
-    .select('email')
-    .eq('id', caseId)
-    .single()
-
-  const emailRow = rawCaseRow as Pick<CaseRow, 'email'> | null
-
-  if (emailRow?.email && urlData?.signedUrl) {
-    await sendDisputeLetterEmail(emailRow.email, caseId, urlData.signedUrl)
-    await typedUpdate(supabase, { status: 'delivered' }).eq('id', caseId)
-  }
 }

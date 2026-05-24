@@ -1,6 +1,6 @@
 import type { ExtractedFacts } from '@/types/api'
 import type { RetrievalResult } from '@/lib/retrieval'
-import type { FightabilityScore, FightabilityReason, RejectionCategory } from '@/types/case'
+import type { FightabilityScore, FightabilityReason } from '@/types/case'
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max)
@@ -20,8 +20,6 @@ function clamp(value: number, min: number, max: number): number {
  */
 export function computeNumericScore(
   retrieval: RetrievalResult,
-  _category: RejectionCategory,
-  _policyAgeMonths: number | null = null,
   textBand: FightabilityScore = 'low'
 ): number {
   const [bandMin, bandCenter, bandMax] =

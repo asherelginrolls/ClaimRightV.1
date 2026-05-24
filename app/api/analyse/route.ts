@@ -632,12 +632,7 @@ export async function GET(
     // ── 5. Fightability scoring (rules-based) ─────────────────────────────
     const factsForScoring = { ...extractedFacts, policy_age_months: derivedPolicyAge }
     const { score, reasons } = calculateFightabilityScore(factsForScoring, retrievalResult)
-    const numericScore = computeNumericScore(
-      retrievalResult,
-      extractedFacts.rejection_reason_category,
-      derivedPolicyAge,
-      score
-    )
+    const numericScore = computeNumericScore(retrievalResult, score)
     console.info('[analyse] stage: scoring-done score=' + score + ' numeric=' + numericScore)
 
     // ── 6. Evidence explainers ────────────────────────────────────────────

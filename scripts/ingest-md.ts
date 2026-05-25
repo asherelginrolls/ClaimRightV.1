@@ -121,7 +121,8 @@ async function main() {
   if (!fs.existsSync(metaAbsolute)) { console.error(`Metadata JSON not found: ${metaAbsolute}`); process.exit(1) }
 
   const meta: DocMetadata = JSON.parse(fs.readFileSync(metaAbsolute, 'utf-8'))
-  const rawMd = fs.readFileSync(mdAbsolute, 'utf-8')
+  // Normalize CRLF → LF so the \n---\n split works on files written on Windows
+  const rawMd = fs.readFileSync(mdAbsolute, 'utf-8').replace(/\r\n/g, '\n')
 
   console.log(`\nIngesting: ${meta.source_title}`)
   console.log(`Circular: ${meta.circular_number}`)

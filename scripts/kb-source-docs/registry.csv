@@ -1,0 +1,6 @@
+doc_id,source_title,circular_number,issuer,tier,date,chunks,status,ingested_at,url
+IOR-2017,Insurance Ombudsman Rules 2017,GSR 1456(E),Government of India Ministry of Finance,1,2017-11-10,5,ingested,2026-05-24,https://cioins.co.in/Content/RulesRegulations/Insurance%20Ombudsman%20Rules%202017.pdf
+CPA-2019,Consumer Protection Act 2019 — Health Insurance Extracts,Act No. 35 of 2019,Government of India Parliament,1,2019-07-20,6,ingested,2026-05-24,https://legislative.gov.in/sites/default/files/A2019-35.pdf
+IOB-AWARDS-2023,Insurance Ombudsman Award Precedents,,Insurance Ombudsman,2,2023-03-31,3,ingested,2026-05-24,https://cioins.co.in/Decisions
+IRDAI-MC-SUPP-2024,IRDAI Master Circular on Health Insurance Business — Supplementary Extracts,IRDAI/HLT/CIR/PRO/84/5/2024,IRDAI,1,2024-05-29,4,ingested,2026-05-24,https://irdai.gov.in/document-detail?documentId=4942918
+IRDAI-MC-GAPS-2024,IRDAI Master Circular on Health Insurance Business — Targeted Gap Extracts,IRDAI/HLT/CIR/PRO/84/5/2024,IRDAI,1,2024-05-29,3,ingested,2026-05-24,https://irdai.gov.in/document-detail?documentId=4942918

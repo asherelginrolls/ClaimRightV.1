@@ -52,7 +52,12 @@ export async function POST(
     .update(`${razorpay_order_id}|${razorpay_payment_id}`)
     .digest('hex')
 
-  if (expectedSignature !== razorpay_signature) {
+  const expectedBuf = Buffer.from(expectedSignature, 'hex')
+  const receivedBuf = Buffer.from(razorpay_signature, 'hex')
+  const sigValid =
+    expectedBuf.length === receivedBuf.length &&
+    crypto.timingSafeEqual(expectedBuf, receivedBuf)
+  if (!sigValid) {
     return NextResponse.json({ error: 'Payment verification failed' }, { status: 400 })
   }
 

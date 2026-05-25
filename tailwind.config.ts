@@ -18,9 +18,9 @@ const config: Config = {
         darkBase: "#0E1411",
       },
       fontFamily: {
-        serif: ["Fraunces", "Georgia", "serif"],
-        sans: ["Inter", "system-ui", "sans-serif"],
-        mono: ["JetBrains Mono", "Menlo", "monospace"],
+        serif: ["var(--font-fraunces)", "Georgia", "serif"],
+        sans: ["var(--font-inter)", "system-ui", "sans-serif"],
+        mono: ["var(--font-jetbrains-mono)", "Menlo", "monospace"],
       },
     },
   },

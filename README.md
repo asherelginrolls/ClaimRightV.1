@@ -1,36 +1,32 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ClaimRight
 
-## Getting Started
+AI-powered health insurance dispute co-pilot for India. Upload a rejection letter, get a fightability score backed by verified IRDAI regulations and ombudsman precedents, then generate a formal dispute letter PDF — all for ₹99.
 
-First, run the development server:
+## Stack
+
+- **Frontend/Hosting:** Next.js 14 (App Router) + Tailwind CSS, deployed on Vercel
+- **Database/Storage:** Supabase (PostgreSQL + pgvector + file storage)
+- **Embeddings:** Voyage AI (`voyage-law-2`) — legal-domain fine-tuned
+- **LLM:** Claude Haiku 4.5 (extraction/scoring) + Claude Sonnet 4.6 (letter generation)
+- **OCR:** Sarvam Vision (PDFs, Indian languages) with Claude Haiku fallback
+- **Payments:** Razorpay (UPI + card + netbanking)
+- **Email:** Resend
+
+## Setup
+
+Copy `.env.example` to `.env.local` and fill in all required keys (see `CLAUDE.md` for the full list).
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev        # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+For cookie-gated routes (`/api/analyse`, `/api/generate`) to work locally without uploading a file, set `SKIP_COOKIE_CHECK=true` in `.env.local`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Database
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Migrations are in `supabase/migrations/`. Apply them in order via the Supabase SQL editor or CLI. The `match_kb_chunks` PostgreSQL function (defined in migration 001) is required for vector search — PostgREST cannot call pgvector operators directly.
 
-## Learn More
+## Deploy
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Push to `main`. Vercel auto-deploys. Set all env vars in the Vercel dashboard. Do NOT switch `RAZORPAY_KEY_ID` to live keys until all items in the CLAUDE_PART2.md §7 pre-live checklist are confirmed.

@@ -2,6 +2,7 @@ import { createServiceClient } from '@/lib/supabase'
 import { embedText } from '@/lib/voyage'
 import type { KbSearchResult } from '@/types/kb'
 import { expandQueryWithSynonyms } from '@/lib/synonyms'
+import { RETRIEVAL_MIN_THRESHOLD } from '@/lib/thresholds'
 
 // Re-export so callers that previously imported from here still work
 export { expandQueryWithSynonyms }
@@ -26,7 +27,7 @@ export async function retrieveChunks(
     matchCount?: number
   } = {}
 ): Promise<RetrievalResult> {
-  const { matchThreshold = 0.65, matchCount = 10 } = options
+  const { matchThreshold = RETRIEVAL_MIN_THRESHOLD, matchCount = 10 } = options
 
   const queryEmbedding = await embedText(query, 'query')
 

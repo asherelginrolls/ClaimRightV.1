@@ -180,7 +180,14 @@ export async function POST(
       throw new Error(`case_documents insert failed: ${docsError.message}`)
     }
 
-    return NextResponse.json({ caseId, message: 'Documents uploaded. Redirecting to analysis...' })
+    const response = NextResponse.json({ caseId, message: 'Documents uploaded. Redirecting to analysis...' })
+    response.cookies.set('cr_sid', caseId, {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24, // 24 hours
+    })
+    return response
   } catch (error) {
     console.error('[upload] Error:', error)
     return NextResponse.json(

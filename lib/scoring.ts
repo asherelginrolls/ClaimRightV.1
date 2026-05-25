@@ -1,6 +1,10 @@
 import type { ExtractedFacts } from '@/types/api'
 import type { RetrievalResult } from '@/lib/retrieval'
 import type { FightabilityScore, FightabilityReason } from '@/types/case'
+import {
+  RETRIEVAL_MIN_THRESHOLD,
+  STRONG_MATCH_THRESHOLD,
+} from '@/lib/thresholds'
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max)
@@ -32,7 +36,7 @@ export function computeNumericScore(
   const topScore = retrieval.topScore
   const retrievalQuality =
     topScore > 0
-      ? clamp((topScore - 0.65) / 0.35, -1, 1)
+      ? clamp((topScore - RETRIEVAL_MIN_THRESHOLD) / (1 - RETRIEVAL_MIN_THRESHOLD), -1, 1)
       : -1
 
   // Shift the center by up to 70% of the half-band width in each direction.
@@ -58,7 +62,7 @@ export function calculateFightabilityScore(
 
   const strongReasons: FightabilityReason[] = []
 
-  if (topScore >= 0.80 && chunks.length > 0) {
+  if (topScore >= STRONG_MATCH_THRESHOLD && chunks.length > 0) {
     strongReasons.push({
       reason: `A directly applicable IRDAI regulation was found that supports your dispute (match confidence: ${Math.round(topScore * 100)}%).`,
       citation: buildCitation(chunks[0]),
@@ -108,7 +112,7 @@ export function calculateFightabilityScore(
 
   const mediumReasons: FightabilityReason[] = []
 
-  if (topScore >= 0.65 && topScore < 0.80 && chunks.length > 0) {
+  if (topScore >= RETRIEVAL_MIN_THRESHOLD && topScore < STRONG_MATCH_THRESHOLD && chunks.length > 0) {
     mediumReasons.push({
       reason: `A potentially applicable IRDAI regulation was found that may support your dispute (match confidence: ${Math.round(topScore * 100)}%).`,
       citation: buildCitation(chunks[0]),

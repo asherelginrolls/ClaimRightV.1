@@ -1,6 +1,10 @@
 import { createServiceClient } from '@/lib/supabase'
 import { embedText } from '@/lib/voyage'
 import type { KbSearchResult } from '@/types/kb'
+import { expandQueryWithSynonyms } from '@/lib/synonyms'
+
+// Re-export so callers that previously imported from here still work
+export { expandQueryWithSynonyms }
 
 export interface RetrievalResult {
   chunks: KbSearchResult[]
@@ -78,6 +82,7 @@ export async function retrieveForCase(extractedFacts: {
     'IRDAI regulation health insurance India',
   ].filter((p): p is string => p !== null)
 
-  const query = queryParts.join('. ')
+  const rawQuery = queryParts.join('. ')
+  const query = expandQueryWithSynonyms(rawQuery)
   return retrieveChunks(query)
 }

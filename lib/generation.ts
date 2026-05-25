@@ -1,7 +1,18 @@
 import { z } from 'zod'
 import { sonnet } from '@/lib/claude'
 import { retrieveChunks, retrieveForCase } from '@/lib/retrieval'
-import { GENERATION_SYSTEM_PROMPT, GENERATION_USER_PROMPT } from '@/prompts/generation'
+import {
+  GENERATION_SYSTEM_PROMPT,
+  GENERATION_USER_PROMPT,
+  LETTER_HEADER_TEMPLATE,
+  LETTER_TRI_CLAUSE,
+  LETTER_ESCALATION_SENTENCE,
+} from '@/prompts/generation'
+import {
+  CATEGORY_BASELINES,
+  getCategoryBaseline,
+  type CanonicalCategory,
+} from '@/prompts/category-baselines'
 import { createServiceClient, type Database } from '@/lib/supabase'
 import type { KbSearchResult } from '@/types/kb'
 
@@ -17,21 +28,21 @@ const POST_PAYMENT_MIN_CITATIONS = 3
 
 type CaseRow = Database['public']['Tables']['cases']['Row']
 
-// ── Internal Zod schemas (not exported) ─────────────────────────────────────
+// ── Internal Zod schemas (exported for test-script + future callers) ────────
 
-const CitationSchema = z.object({
+export const CitationSchema = z.object({
   chunk_id: z.string().uuid(),
   regulation_title: z.string(),
   section: z.string(),
   snippet: z.string().min(6),
 })
 
-const LetterParagraphSchema = z.object({
+export const LetterParagraphSchema = z.object({
   text: z.string(),
   citations: z.array(CitationSchema),
 })
 
-const LetterOutputSchema = z.object({
+export const LetterOutputSchema = z.object({
   subject_line: z.string(),
   salutation: z.string(),
   body_paragraphs: z.array(LetterParagraphSchema),
@@ -39,6 +50,7 @@ const LetterOutputSchema = z.object({
   relief_sought: z.string(),
 })
 
+export type LetterOutput = z.infer<typeof LetterOutputSchema>
 type Citation = z.infer<typeof CitationSchema>
 
 // ── Public types ─────────────────────────────────────────────────────────────
@@ -71,6 +83,18 @@ export interface GenerationResult {
   citationsFailed: number
   citationsFlagged: number
   kbMissNote: string | null
+  /** Verbatim §2 scaffold blocks — appended/prepended around the LLM body. */
+  headerBlock: string
+  triClauseBlock: string
+  escalationBlock: string
+}
+
+export interface CaseFacts {
+  insurer: string
+  claimAmount: number // in paise
+  rejectionReasonRaw: string
+  rejectionReasonCategory: CanonicalCategory
+  rejectionDate: string | null
 }
 
 // ── Private helpers ──────────────────────────────────────────────────────────
@@ -117,38 +141,44 @@ function softenLanguage(text: string): string {
   )
 }
 
-// ── Procedural baseline appended when LLM output falls below hard minimums ──
+// ── Category-aware procedural baseline (CLAUDE_PART2.md §1) ─────────────────
 //
-// Per CLAUDE_PART2.md §1, post-payment letters MUST be ≥ 400 words and have
-// ≥ 3 inline citations. If the LLM came up short (e.g. KB-empty case), we
-// append this universal procedural paragraph. It cites the most-applicable
-// retrieved chunk if any, otherwise falls back to citing the IRDAI Master
-// Circular framework generically (which is well-known and verifiable).
+// Appended when the LLM output falls below the post-payment hard minimums
+// (≥ 400 words, ≥ 3 inline citations). Pulls a category-specific baseline
+// paragraph from prompts/category-baselines.ts. If a Master-Circular chunk is
+// present in the retrieved set we cite it with the real chunk_id (status
+// 'pass'); otherwise the citation is surfaced inline but flagged in metrics.
 
 function buildProceduralBaseline(
-  fallbackChunk: KbSearchResult | null
+  category: CanonicalCategory,
+  retrievedChunks: KbSearchResult[]
 ): ValidatedParagraph {
-  const cite = fallbackChunk
-    ? `[Source: ${fallbackChunk.source_title}${fallbackChunk.section_number ? `, §${fallbackChunk.section_number}` : ''}]`
-    : '[Source: IRDAI Master Circular on Health Insurance, 29.05.2024]'
+  const baseline = getCategoryBaseline(category)
+  const text = baseline.baselineParagraph
 
-  const text = `Independent of the merits of the specific ground cited in the rejection, I respectfully invoke the procedural framework established by the Insurance Regulatory and Development Authority of India for the redressal of policyholder grievances. The IRDAI Master Circular on Health Insurance dated 29.05.2024 mandates that insurers act on grievances within defined timelines and provide reasoned written communications. ${cite} I further reserve the right, under the Insurance Ombudsman Rules 2017, to escalate this matter to the Insurance Ombudsman should this grievance not be resolved within fifteen days. ${cite} I therefore request a reasoned, written reconsideration of the rejection at the earliest, failing which I shall pursue the statutory remedies available to me under the said framework.`
+  // Try to resolve the fallback citation against a retrieved Master-Circular
+  // chunk. Case-insensitive substring match on source_title.
+  const titleNeedle = baseline.fallbackCitation.regulation_title.toLowerCase()
+  const matchedChunk = retrievedChunks.find((c) =>
+    c.source_title.toLowerCase().includes(titleNeedle)
+  )
 
-  const citation: ValidatedCitation | null = fallbackChunk
-    ? {
-        chunk_id: fallbackChunk.id,
-        regulation_title: fallbackChunk.source_title,
-        section: fallbackChunk.section_number ?? '',
-        snippet: '',
-        overlap: 1,
-        status: 'pass',
-      }
-    : null
+  // The baseline paragraph contains exactly 2 inline [Source: ...] markers,
+  // so we surface 2 structured citations to keep markers and citations in sync.
+  const citationBase = {
+    regulation_title: baseline.fallbackCitation.regulation_title,
+    section: baseline.fallbackCitation.section,
+    snippet: baseline.fallbackCitation.snippet,
+  }
+
+  const citation: ValidatedCitation = matchedChunk
+    ? { ...citationBase, chunk_id: matchedChunk.id, overlap: 1, status: 'pass' }
+    : { ...citationBase, chunk_id: '', overlap: 0, status: 'flag' }
 
   return {
     text,
     validatedText: text,
-    citations: citation ? [citation, citation] : [],
+    citations: [citation, citation],
     hasRemovedClaims: false,
   }
 }
@@ -167,7 +197,13 @@ function countValidCitations(paragraphs: ValidatedParagraph[]): number {
   )
 }
 
-// ── Span validation for a single paragraph ──────────────────────────────────
+// ── Span validation for a single paragraph (CLAUDE_PART2.md §1) ─────────────
+//
+// Post-payment rule: FAIL spans are SOFTENED, not deleted. Sentences are ONLY
+// removed when their citation marker references a chunk_id that is NOT in the
+// retrieved set (true hallucination). This is the explicit divergence from
+// the pre-payment behavior — once a user has paid, we never punch holes in
+// the letter for low-overlap snippets; we only excise outright fabrications.
 
 function validateParagraph(
   para: { text: string; citations: Citation[] },
@@ -225,7 +261,63 @@ function validateParagraph(
   }
 }
 
-// ── Main export ──────────────────────────────────────────────────────────────
+// ── Pure assembler (CLAUDE_PART2.md §1 — steps 4 + 5 + 6) ───────────────────
+//
+// Exported so the regression script (scripts/test-generation.ts) can exercise
+// the validation + hard-minimums backfill logic with mocked retrievals and
+// mocked LLM JSON, without hitting Supabase / Voyage / Anthropic.
+
+export function assembleValidatedLetter(
+  caseFacts: CaseFacts,
+  chunks: KbSearchResult[],
+  llmOutput: LetterOutput,
+  options: { lowConfidence?: boolean } = {}
+): GenerationResult {
+  // STEPS 4 + 5: SPAN VALIDATION + THRESHOLD FILTERING
+  const chunkMap = new Map(chunks.map((c) => [c.id, c]))
+  const counters = { total: 0, failed: 0, flagged: 0 }
+
+  const validatedParagraphs: ValidatedParagraph[] = llmOutput.body_paragraphs.map((para) =>
+    validateParagraph(para, chunkMap, counters)
+  )
+
+  // STEP 6: POST-PAYMENT HARD MINIMUMS (CLAUDE_PART2.md §1)
+  // ≥ 400 words, ≥ 3 valid citations. If short, append the category-specific
+  // baseline paragraph (one or more times). Safety break after 5 extra
+  // appends prevents any pathological loop even with an empty starting draft.
+  const startCount = llmOutput.body_paragraphs.length
+  while (
+    countWords(validatedParagraphs) < POST_PAYMENT_MIN_WORDS ||
+    countValidCitations(validatedParagraphs) < POST_PAYMENT_MIN_CITATIONS
+  ) {
+    const baseline = buildProceduralBaseline(caseFacts.rejectionReasonCategory, chunks)
+    validatedParagraphs.push(baseline)
+    counters.total += baseline.citations.length
+    if (validatedParagraphs.length > startCount + 5) break
+  }
+
+  return {
+    subjectLine: llmOutput.subject_line,
+    salutation: llmOutput.salutation,
+    paragraphs: validatedParagraphs,
+    closing: llmOutput.closing,
+    reliefSought: llmOutput.relief_sought,
+    citationsTotal: counters.total,
+    citationsFailed: counters.failed,
+    citationsFlagged: counters.flagged,
+    kbMissNote: options.lowConfidence
+      ? 'This letter relies primarily on the procedural framework as direct category-specific regulations had limited match in our knowledge base.'
+      : null,
+    headerBlock: LETTER_HEADER_TEMPLATE(
+      new Date().toISOString().slice(0, 10),
+      caseFacts.insurer
+    ),
+    triClauseBlock: LETTER_TRI_CLAUSE(Math.round(caseFacts.claimAmount / 100)),
+    escalationBlock: LETTER_ESCALATION_SENTENCE,
+  }
+}
+
+// ── Main orchestrator ───────────────────────────────────────────────────────
 
 export async function generateDisputeLetter(caseId: string): Promise<GenerationResult> {
   const supabase = createServiceClient()
@@ -303,7 +395,7 @@ export async function generateDisputeLetter(caseId: string): Promise<GenerationR
     generationResponse.content[0]?.type === 'text' ? generationResponse.content[0].text : '{}'
   const cleanJson = rawText.replace(/```json\n?/g, '').replace(/```/g, '').trim()
 
-  let letterOutput: z.infer<typeof LetterOutputSchema>
+  let letterOutput: LetterOutput
   try {
     letterOutput = LetterOutputSchema.parse(JSON.parse(cleanJson))
   } catch (parseError) {
@@ -311,43 +403,21 @@ export async function generateDisputeLetter(caseId: string): Promise<GenerationR
     throw new Error('LLM returned invalid letter structure')
   }
 
-  // STEPS 4 + 5: SPAN VALIDATION + THRESHOLD FILTERING
-  const chunkMap = new Map(retrievalResult.chunks.map((c) => [c.id, c]))
-  const counters = { total: 0, failed: 0, flagged: 0 }
+  // STEPS 4 + 5 + 6: delegate to pure assembler
+  const categoryRaw = caseRow.rejection_reason_category ?? 'other'
+  const category =
+    categoryRaw in CATEGORY_BASELINES ? (categoryRaw as CanonicalCategory) : 'other'
 
-  const validatedParagraphs: ValidatedParagraph[] = letterOutput.body_paragraphs.map((para) =>
-    validateParagraph(para, chunkMap, counters)
+  return assembleValidatedLetter(
+    {
+      insurer: caseRow.insurer ?? 'the insurer',
+      claimAmount: caseRow.claim_amount ?? 0,
+      rejectionReasonRaw: caseRow.rejection_reason_raw,
+      rejectionReasonCategory: category,
+      rejectionDate: caseRow.rejection_date,
+    },
+    retrievalResult.chunks,
+    letterOutput,
+    { lowConfidence }
   )
-
-  // STEP 6: POST-PAYMENT HARD MINIMUMS (CLAUDE_PART2.md §1)
-  // ≥ 400 words, ≥ 3 valid citations. If the LLM came up short (likely a
-  // weak-KB case), append a procedural-baseline paragraph that grounds the
-  // letter in the universally-applicable IRDAI grievance framework.
-  const fallbackChunk = retrievalResult.chunks[0] ?? null
-  while (
-    countWords(validatedParagraphs) < POST_PAYMENT_MIN_WORDS ||
-    countValidCitations(validatedParagraphs) < POST_PAYMENT_MIN_CITATIONS
-  ) {
-    const baseline = buildProceduralBaseline(fallbackChunk)
-    validatedParagraphs.push(baseline)
-    counters.total += baseline.citations.length
-    // Safety break — baseline contributes ~120 words + 2 citations, so 4
-    // appends will always satisfy the minimums even with an empty starting
-    // letter. Bail after 5 to avoid any pathological loop.
-    if (validatedParagraphs.length > letterOutput.body_paragraphs.length + 5) break
-  }
-
-  return {
-    subjectLine: letterOutput.subject_line,
-    salutation: letterOutput.salutation,
-    paragraphs: validatedParagraphs,
-    closing: letterOutput.closing,
-    reliefSought: letterOutput.relief_sought,
-    citationsTotal: counters.total,
-    citationsFailed: counters.failed,
-    citationsFlagged: counters.flagged,
-    kbMissNote: lowConfidence
-      ? 'This letter relies primarily on the procedural framework as direct category-specific regulations had limited match in our knowledge base.'
-      : null,
-  }
 }

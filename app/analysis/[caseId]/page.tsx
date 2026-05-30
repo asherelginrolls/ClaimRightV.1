@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import type { AnalyseResponse } from '@/types/api'
@@ -131,13 +131,39 @@ export default function AnalysisPage() {
   const [result, setResult] = useState<AnalyseResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const deepFiredRef = useRef(false)
 
   useEffect(() => {
     const controller = new AbortController()
+    const deepController = new AbortController()
     // Client-side ceiling slightly under the 60s Vercel maxDuration so a
     // truly-stuck request surfaces as an actionable error instead of an
     // indefinite spinner.
     const timeout = setTimeout(() => controller.abort(), 55_000)
+    const deepTimeout = setTimeout(() => deepController.abort(), 50_000)
+
+    // DEEP phase: the point-by-point analysis is generated OUT of the blocking
+    // path. We fire it once, after the fast result has rendered, and merge the
+    // bullets in when they arrive. Screen 3 is fully usable without them, so any
+    // failure here is silent (the blurred block already has fallback copy).
+    async function fetchDeep() {
+      if (deepFiredRef.current) return
+      deepFiredRef.current = true
+      try {
+        const res = await fetch(`/api/analyse?caseId=${caseId}&phase=deep`, {
+          signal: deepController.signal,
+        })
+        if (!res.ok) return
+        const deep = (await res.json()) as AnalyseResponse & { error?: string }
+        if (deep.error || !Array.isArray(deep.pointByPointAnalysis)) return
+        if (deep.pointByPointAnalysis.length === 0) return
+        setResult((prev) =>
+          prev ? { ...prev, pointByPointAnalysis: deep.pointByPointAnalysis } : prev
+        )
+      } catch {
+        // silent — page renders fully without the deep bullets
+      }
+    }
 
     async function fetchAnalysis() {
       try {
@@ -147,6 +173,11 @@ export default function AnalysisPage() {
           setError(data.error ?? 'Analysis failed. Please try again.')
         } else {
           setResult(data)
+          // Only fetch the deep phase if the fast result didn't already carry it
+          // (e.g. a refresh after the bullets were cached costs nothing).
+          if (!data.pointByPointAnalysis || data.pointByPointAnalysis.length === 0) {
+            void fetchDeep()
+          }
         }
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') {
@@ -163,7 +194,9 @@ export default function AnalysisPage() {
     if (caseId) fetchAnalysis()
     return () => {
       clearTimeout(timeout)
+      clearTimeout(deepTimeout)
       controller.abort()
+      deepController.abort()
     }
   }, [caseId])
 

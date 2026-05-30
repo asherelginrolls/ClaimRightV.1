@@ -1,13 +1,75 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { createServiceClient, type Database } from '@/lib/supabase'
+import { extractTextFromDocument } from '@/lib/ocr'
 import { randomUUID } from 'crypto'
 import type { UploadResponse, ApiError } from '@/types/api'
 import type { DocType } from '@/types/case'
 import { rateLimitUpload } from '@/lib/rate-limit'
 import { verifyTurnstileToken } from '@/lib/turnstile'
 
+// Node runtime (Buffer + Anthropic SDK + waitUntil). maxDuration must cover the
+// background OCR that runs AFTER the response is sent (Fluid Compute allows up
+// to 300; 60 is plenty with parallel OCR of ≤5 docs).
+export const runtime = 'nodejs'
+export const maxDuration = 60
+
 type CaseInsert = Database['public']['Tables']['cases']['Insert']
 type CaseDocInsert = Database['public']['Tables']['case_documents']['Insert']
+type SupabaseClient = ReturnType<typeof createServiceClient>
+
+interface OcrDocMeta {
+  storagePath: string
+  buffer: Buffer
+  mimeType: string
+}
+
+// Background OCR: runs after the upload response is sent (Next 14.2 has no
+// after(), so we use Vercel waitUntil). OCRs every doc in PARALLEL and caches
+// the text on case_documents.ocr_text, keyed by storage_path (unique per doc).
+// Idempotent: a doc that already has ocr_text is skipped, and each doc is
+// isolated in its own try/catch so one failure never blocks the others. By the
+// time the user reaches Screen 3, the text is usually already cached, so
+// /api/analyse does ZERO Vision OCR.
+async function ocrDocsInBackground(docMeta: OcrDocMeta[]): Promise<void> {
+  const supabase: SupabaseClient = createServiceClient()
+  await Promise.all(
+    docMeta.map(async (d) => {
+      try {
+        const { data: existing } = await (
+          supabase
+            .from('case_documents')
+            .select('ocr_text')
+            .eq('storage_path', d.storagePath)
+            .single() as unknown as Promise<{ data: { ocr_text: string | null } | null }>
+        )
+        if (existing?.ocr_text && existing.ocr_text.trim().length > 0) {
+          console.info('[upload] ocr-bg skip (cached) ' + d.storagePath)
+          return
+        }
+
+        console.info('[upload] ocr-bg start ' + d.storagePath)
+        const text = await extractTextFromDocument(d.buffer, d.mimeType)
+        console.info('[upload] ocr-bg end ' + d.storagePath + ' len=' + text.length)
+
+        if (text.trim().length > 0) {
+          await (
+            supabase.from('case_documents').update as unknown as (
+              v: { ocr_text: string }
+            ) => {
+              eq: (col: string, val: string) => Promise<{ error: { message: string } | null }>
+            }
+          )({ ocr_text: text }).eq('storage_path', d.storagePath)
+        }
+      } catch (err) {
+        console.warn(
+          '[upload] ocr-bg failed ' + d.storagePath + ':',
+          err instanceof Error ? err.message : String(err)
+        )
+      }
+    })
+  )
+}
 
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png'])
 const ALLOWED_DOC_TYPES = new Set<DocType>([
@@ -178,6 +240,23 @@ export async function POST(
 
     if (docsError) {
       throw new Error(`case_documents insert failed: ${docsError.message}`)
+    }
+
+    // Kick off OCR in the background using the in-memory buffers (no re-download).
+    // The response returns immediately; OCR + caching run after it is sent.
+    // waitUntil keeps the serverless function alive until OCR finishes on Vercel;
+    // off-Vercel (e.g. local `next dev`) there is no request context, so we fall
+    // back to fire-and-forget — the dev process stays alive long enough to finish.
+    const docMeta: OcrDocMeta[] = files.map((file, i) => ({
+      storagePath: storagePaths[i],
+      buffer: fileBuffers[i],
+      mimeType: file.type,
+    }))
+    const ocrPromise = ocrDocsInBackground(docMeta)
+    try {
+      waitUntil(ocrPromise)
+    } catch {
+      void ocrPromise
     }
 
     return NextResponse.json({ caseId, message: 'Documents uploaded. Redirecting to analysis...' })

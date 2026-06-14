@@ -303,6 +303,166 @@ function runOne(
   return assertCase(category, scenario, result)
 }
 
+// ── Span-validation isolation regression (Task 1: hallucination removal) ─────
+//
+// Guards the fix for the sentence-removal boundary bug. A fabricated citation
+// must remove ONLY its own sentence + inline marker, leaving legitimate
+// neighbouring claims and their real [Source: ...] markers intact. Also covers
+// inline-title drift (section fallback) and a marker-omitted snippet fallback.
+// Each case is fed through the real assembler, then asserted on paragraph 0.
+
+interface SpanCheck {
+  name: string
+  passed: boolean
+  detail: string
+}
+
+function firstParaText(
+  facts: CaseFacts,
+  chunks: KbSearchResult[],
+  letter: LetterOutput
+): string {
+  const result = assembleValidatedLetter(facts, chunks, letter, { lowConfidence: true })
+  return result.paragraphs[0]?.validatedText ?? ''
+}
+
+function runSpanIsolationChecks(): SpanCheck[] {
+  const checks: SpanCheck[] = []
+  const facts = makeCaseFacts('documentation_incomplete')
+  const realChunk = makeChunk(
+    randomUUID(),
+    'IRDAI Master Circular on Health Insurance',
+    '5.7',
+    MASTER_CIRCULAR_TEXT,
+    0.85,
+    1
+  )
+  const realSnippet =
+    'Reimbursement claims shall be settled within thirty days of receipt of the last necessary document'
+  const realCitation = {
+    chunk_id: realChunk.id,
+    regulation_title: 'IRDAI Master Circular on Health Insurance',
+    section: '5.7',
+    snippet: realSnippet,
+  }
+
+  // Case 1: fabricated + real citation in the SAME paragraph. The pre-fix regex
+  // deleted the real "Claim B" sentence and kept the fabricated "Claim A".
+  {
+    const letter: LetterOutput = {
+      subject_line: 'S',
+      salutation: 'Dear Sir/Madam,',
+      body_paragraphs: [
+        {
+          text:
+            'The insurer made piecemeal document requests in clear breach of the circular. ' +
+            '[Source: Fabricated Regulation, §99] ' +
+            'Reimbursement claims must be settled within thirty days of the last document. ' +
+            '[Source: IRDAI Master Circular on Health Insurance, §5.7]',
+          citations: [
+            {
+              chunk_id: randomUUID(), // not in chunks → hallucination
+              regulation_title: 'Fabricated Regulation',
+              section: '99',
+              snippet: 'this snippet references a chunk that does not exist in retrieval',
+            },
+            realCitation,
+          ],
+        },
+      ],
+      closing: 'C',
+      relief_sought: 'R',
+    }
+    const out = firstParaText(facts, [realChunk], letter)
+    const passed =
+      !out.includes('clear breach of the circular') &&
+      !out.includes('Fabricated Regulation') &&
+      out.includes('Reimbursement claims must be settled within thirty days') &&
+      out.includes('[Source: IRDAI Master Circular on Health Insurance, §5.7]')
+    checks.push({
+      name: 'fabricated sentence removed; real claim + its marker survive intact',
+      passed,
+      detail: passed ? '' : `got: ${JSON.stringify(out)}`,
+    })
+  }
+
+  // Case 2: inline marker TITLE differs from structured regulation_title; the
+  // section number still matches → removed via the section fallback.
+  {
+    const letter: LetterOutput = {
+      subject_line: 'S',
+      salutation: 'Dear Sir/Madam,',
+      body_paragraphs: [
+        {
+          text:
+            'An experimental treatment label was applied without any clinical basis whatsoever. ' +
+            '[Source: Some Other Wording, §7.1] ' +
+            'The treating physician has certified the treatment as the standard of care. ' +
+            '[Source: IRDAI Master Circular on Health Insurance, §5.7]',
+          citations: [
+            {
+              chunk_id: randomUUID(), // hallucination; inline title != structured title
+              regulation_title: 'IRDAI Master Circular Health Insurance 2024 Special Edition',
+              section: '7.1',
+              snippet: 'experimental treatment label applied without clinical basis',
+            },
+            realCitation,
+          ],
+        },
+      ],
+      closing: 'C',
+      relief_sought: 'R',
+    }
+    const out = firstParaText(facts, [realChunk], letter)
+    const passed =
+      !out.includes('experimental treatment label') &&
+      out.includes('treating physician has certified') &&
+      out.includes('[Source: IRDAI Master Circular on Health Insurance, §5.7]')
+    checks.push({
+      name: 'title-drift hallucination removed via section fallback',
+      passed,
+      detail: passed ? '' : `got: ${JSON.stringify(out)}`,
+    })
+  }
+
+  // Case 3: model omitted the inline marker entirely → snippet-overlap fallback
+  // removes the unsupported sentence so it cannot survive silently.
+  {
+    const letter: LetterOutput = {
+      subject_line: 'S',
+      salutation: 'Dear Sir/Madam,',
+      body_paragraphs: [
+        {
+          text:
+            'The insurer alleged fraud without any documented investigation report. ' +
+            'The grievance redressal officer must respond within fifteen days as mandated.',
+          citations: [
+            {
+              chunk_id: randomUUID(), // hallucination, no inline marker present
+              regulation_title: 'Nonexistent Act',
+              section: '1',
+              snippet: 'insurer alleged fraud without any documented investigation report',
+            },
+          ],
+        },
+      ],
+      closing: 'C',
+      relief_sought: 'R',
+    }
+    const out = firstParaText(facts, [], letter)
+    const passed =
+      !out.includes('alleged fraud without') &&
+      out.includes('grievance redressal officer must respond within fifteen days')
+    checks.push({
+      name: 'marker-omitted hallucination removed via snippet fallback',
+      passed,
+      detail: passed ? '' : `got: ${JSON.stringify(out)}`,
+    })
+  }
+
+  return checks
+}
+
 function main(): void {
   const categories: CanonicalCategory[] = Object.keys(CATEGORY_BASELINES) as CanonicalCategory[]
   const scenarios: Array<'high-score' | 'low-score' | 'empty'> = [
@@ -343,8 +503,19 @@ function main(): void {
     }
   }
 
-  console.log(`\n${passed}/${reports.length} ${passed === reports.length ? '✓' : '✗'}`)
-  process.exit(failed.length > 0 ? 1 : 0)
+  // Span-validation isolation regression (Task 1)
+  const spanChecks = runSpanIsolationChecks()
+  const spanPassed = spanChecks.filter((c) => c.passed)
+  const spanFailed = spanChecks.filter((c) => !c.passed)
+  console.log('\nSpan-validation isolation checks:')
+  for (const c of spanChecks) {
+    console.log(`  ${c.passed ? '✓' : '✗'} ${c.name}${c.detail ? ` — ${c.detail}` : ''}`)
+  }
+
+  const totalPassed = passed + spanPassed.length
+  const totalCount = reports.length + spanChecks.length
+  console.log(`\n${totalPassed}/${totalCount} ${totalPassed === totalCount ? '✓' : '✗'}`)
+  process.exit(failed.length + spanFailed.length > 0 ? 1 : 0)
 }
 
 main()

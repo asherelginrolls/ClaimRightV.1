@@ -134,10 +134,11 @@ export default function AnalysisPage() {
 
   useEffect(() => {
     const controller = new AbortController()
-    // Client-side ceiling slightly under the 60s Vercel maxDuration so a
-    // truly-stuck request surfaces as an actionable error instead of an
-    // indefinite spinner.
-    const timeout = setTimeout(() => controller.abort(), 55_000)
+    // Client-side ceiling under the raised server maxDuration (300s with Fluid
+    // Compute) so a truly-stuck request surfaces as an actionable error instead
+    // of an indefinite spinner. The fast path normally returns in well under
+    // this; the margin only covers unusually slow/large PDFs.
+    const timeout = setTimeout(() => controller.abort(), 120_000)
 
     async function fetchAnalysis() {
       try {

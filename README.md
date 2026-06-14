@@ -151,112 +151,9 @@ npm run dev
 
 Open http://localhost:3000.
 
-**Environment variables** (`.env.local`, never committed):
 
-```
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-VOYAGE_API_KEY=
-ANTHROPIC_API_KEY=
-RAZORPAY_KEY_ID=
-RAZORPAY_KEY_SECRET=
-NEXT_PUBLIC_RAZORPAY_KEY_ID=
-RESEND_API_KEY=
-UPSTASH_REDIS_REST_URL=
-UPSTASH_REDIS_REST_TOKEN=
-```
 
-**Database setup** (run in Supabase SQL editor):
-
-```sql
--- Enable pgvector
-CREATE EXTENSION IF NOT EXISTS vector;
-
--- Cases table
-CREATE TABLE cases (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  email TEXT,
-  status TEXT CHECK (status IN ('uploaded', 'analysed', 'paid', 'generated', 'delivered')) DEFAULT 'uploaded',
-  insurer TEXT,
-  claim_amount INTEGER,
-  rejection_reason_raw TEXT,
-  rejection_reason_category TEXT,
-  rejection_date DATE,
-  fightability_score TEXT CHECK (fightability_score IN ('low', 'medium', 'strong')),
-  fightability_reasons JSONB,
-  document_path TEXT,
-  letter_path TEXT,
-  razorpay_order_id TEXT,
-  razorpay_payment_id TEXT,
-  paid_at TIMESTAMPTZ
-);
-
--- KB chunks table
-CREATE TABLE kb_chunks (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  tier INTEGER CHECK (tier IN (1, 2, 3)),
-  source_title TEXT NOT NULL,
-  section_number TEXT,
-  date DATE,
-  circular_number TEXT,
-  issuer TEXT NOT NULL,
-  url TEXT,
-  content TEXT NOT NULL,
-  embedding VECTOR(1024),
-  fts TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', content)) STORED
-);
-
--- Indexes
-CREATE INDEX ON kb_chunks USING hnsw (embedding vector_cosine_ops);
-CREATE INDEX ON kb_chunks USING GIN (fts);
-
--- Hybrid search function (required — PostgREST cannot call pgvector ops directly)
-CREATE OR REPLACE FUNCTION match_kb_chunks(
-  query_embedding VECTOR(1024),
-  query_text TEXT,
-  match_threshold FLOAT DEFAULT 0.65,
-  match_count INT DEFAULT 10
-)
-RETURNS TABLE (
-  id UUID, content TEXT, source_title TEXT, section_number TEXT,
-  circular_number TEXT, issuer TEXT, url TEXT, tier INTEGER, similarity FLOAT
-)
-LANGUAGE SQL STABLE AS $$
-  SELECT kc.id, kc.content, kc.source_title, kc.section_number,
-    kc.circular_number, kc.issuer, kc.url, kc.tier,
-    (0.7 * (1 - (kc.embedding <=> query_embedding))) +
-    (0.3 * ts_rank(kc.fts, plainto_tsquery('english', query_text))) AS similarity
-  FROM kb_chunks kc
-  WHERE (1 - (kc.embedding <=> query_embedding)) > match_threshold
-  ORDER BY similarity DESC
-  LIMIT match_count;
-$$;
-
--- Enable RLS
-ALTER TABLE cases ENABLE ROW LEVEL SECURITY;
-ALTER TABLE kb_chunks ENABLE ROW LEVEL SECURITY;
-```
-
-**Ingesting the knowledge base:**
-
-```bash
-npx tsx scripts/ingest-irdai.ts     # IRDAI Master Circular 29.05.2024
-npx tsx scripts/ingest-awards.ts    # Ombudsman awards
-npx tsx scripts/validate-kb.ts      # Check coverage across rejection categories
-npx tsx scripts/diagnose-retrieval.ts  # Debug retrieval quality
-```
-
-**Type check:**
-
-```bash
-npx tsc --noEmit
-```
-
----
-
+*
 ## Knowledge base
 
 The KB is what makes the dispute letters defensible. All sources are official government and regulatory documents.
@@ -293,28 +190,7 @@ The pipeline maps every rejection to one of 9 categories:
 
 ---
 
-## Cost per case
 
-At 1,000 cases/month:
-
-| Service | Cost |
-|---|---|
-| Claude Haiku (OCR + extraction + scoring) | ~₹15–20 |
-| Claude Sonnet (letter generation) | ~₹60–65 |
-| Voyage AI embeddings | Free (200M token limit) |
-| Supabase, Vercel, Resend | Free tier |
-| Razorpay | 2% of ₹99 = ~₹2 |
-| **Total** | **~₹82/case** |
-
-Revenue at ₹99/case. Gross margin ~17% at MVP pricing.
-
----
-
-## Legal model
-
-ClaimRight uses an "Assisted Filing" model. The product drafts all content. The user submits it themselves.
-
-IRDAI explicitly prohibits third-party IGMS filing. The Insurance Ombudsman Rules 2017 prohibit legal representatives appearing before the ombudsman. ClaimRight drafts the letter. The policyholder files it. This is intentional, not a limitation.
 
 ---
 

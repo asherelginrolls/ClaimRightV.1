@@ -6,6 +6,8 @@ import type { DocType } from '@/types/case'
 import { rateLimitUpload } from '@/lib/rate-limit'
 import { verifyTurnstileToken } from '@/lib/turnstile'
 
+export const runtime = 'nodejs'
+
 type CaseInsert = Database['public']['Tables']['cases']['Insert']
 type CaseDocInsert = Database['public']['Tables']['case_documents']['Insert']
 
@@ -180,6 +182,14 @@ export async function POST(
       throw new Error(`case_documents insert failed: ${docsError.message}`)
     }
 
+    // NOTE: Upload-time background OCR pre-warm was intentionally dropped.
+    // Next 14.2.35 has no `unstable_after`, `@vercel/functions` (`waitUntil`)
+    // is not a dependency, and plain fire-and-forget silently dies on Vercel
+    // (see app/api/payment/verify/route.ts). Instead, /analyse OCRs every doc
+    // in PARALLEL up front (lib/ocr-docs.ts → ensureOcrForDocs), which is both
+    // the correctness path and fast enough on its own. The shared
+    // ocrCaseDocuments() helper is ready in lib/ocr-docs.ts if a reliable
+    // background mechanism is added later.
     return NextResponse.json({ caseId, message: 'Documents uploaded. Redirecting to analysis...' })
   } catch (error) {
     console.error('[upload] Error:', error)

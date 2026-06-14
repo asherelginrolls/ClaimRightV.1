@@ -2,7 +2,13 @@
 //
 // Enhanced KB retrieval diagnostic — superset of validate-kb.ts.
 // Tests 13 queries covering all 9 rejection categories + ombudsman penalties
-// + synonym variant queries, against the production threshold of 0.65.
+// + synonym variant queries.
+//
+// Per CLAUDE_PART2.md §6 the pipeline RETRIEVES at 0.55 (so the reranker sees
+// weaker [0.55, 0.65) chunks) but GATES pre-payment fightability claims at 0.65.
+// This script surfaces both: it reports each query's best score against the 0.65
+// gate AND flags the [0.55, 0.65) "rerank-only" band to prove those chunks are
+// retrieved without, on their own, justifying a pre-payment claim.
 //
 // For each failing query it emits a failure class:
 //   (a) missing-doc   — no document in KB likely covers this topic
@@ -147,7 +153,16 @@ const QUERIES: DiagQuery[] = [
   },
 ]
 
-const PASS_THRESHOLD = 0.65
+// CLAUDE_PART2.md §6 — retrieve at 0.55, gate at 0.65.
+// Mirrors the production split in lib/retrieval.ts (RETRIEVAL_THRESHOLD /
+// GATING_FLOOR). Redefined locally because lib/retrieval.ts transitively imports
+// next/headers, which cannot load inside a standalone tsx script.
+const RETRIEVAL_FLOOR = 0.55 // chunks >= this reach the reranker
+const GATING_FLOOR = 0.65 // a chunk must clear this to justify a pre-payment claim
+const PASS_THRESHOLD = GATING_FLOOR // pre-payment gating floor
+// Diagnostic RPC floor stays well below RETRIEVAL_FLOOR so we can still see and
+// classify weak/missing-doc matches (e.g. 0.10–0.40) for failure analysis.
+const DIAGNOSTIC_RPC_FLOOR = 0.2
 const WAIT_MS = 22_000 // Voyage AI free tier: 3 RPM
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -200,6 +215,7 @@ async function main() {
     topScore: number
     bestMatch: string
     pass: boolean
+    rerankBandCount: number // chunks in [0.55, 0.65) — newly reach reranker, sub-gate
   }> = []
 
   for (let i = 0; i < QUERIES.length; i++) {
@@ -237,7 +253,7 @@ async function main() {
           continue
         }
         console.log(`  ✗ Voyage embed error: ${msg}\n`)
-        results.push({ q, topScore: 0, bestMatch: '(embed error)', pass: false })
+        results.push({ q, topScore: 0, bestMatch: '(embed error)', pass: false, rerankBandCount: 0 })
         break
       }
     }
@@ -246,13 +262,13 @@ async function main() {
     const { data, error } = await supabase.rpc('match_kb_chunks', {
       query_embedding: embedding,
       query_text: q.query,
-      match_threshold: 0.20, // low floor for diagnostics — we judge at PASS_THRESHOLD
+      match_threshold: DIAGNOSTIC_RPC_FLOOR, // low floor for diagnostics — judge at PASS_THRESHOLD
       match_count: 5,
     })
 
     if (error) {
       console.log(`  ✗ RPC error: ${error.message}\n`)
-      results.push({ q, topScore: 0, bestMatch: '(rpc error)', pass: false })
+      results.push({ q, topScore: 0, bestMatch: '(rpc error)', pass: false, rerankBandCount: 0 })
       continue
     }
 
@@ -272,12 +288,33 @@ async function main() {
     const delta = improvementNote(topScore, q.baselineScore)
     console.log(`  Score: ${topScore.toFixed(3)} ${label}  ${delta}  (baseline: ${q.baselineScore.toFixed(3)})`)
     console.log(`  Best:  ${bestMatch}`)
+
+    // ── Retrieve-at-0.55 / gate-at-0.65 demonstration (CLAUDE_PART2.md §6) ────
+    // Chunks in [0.55, 0.65) now reach the reranker but must NOT, on their own,
+    // justify a pre-payment fightability claim/citation.
+    const rerankBandChunks = chunks.filter(
+      (c) => c.similarity >= RETRIEVAL_FLOOR && c.similarity < GATING_FLOOR
+    )
+    const gateEligible = topScore >= GATING_FLOOR
+    console.log(
+      `  Retrieve(≥${RETRIEVAL_FLOOR}): ${chunks.filter((c) => c.similarity >= RETRIEVAL_FLOOR).length} chunk(s)` +
+        ` | [${RETRIEVAL_FLOOR},${GATING_FLOOR}) rerank-only band: ${rerankBandChunks.length}` +
+        ` | Gate(≥${GATING_FLOOR}): ${gateEligible ? 'ELIGIBLE' : 'BLOCKED'}`
+    )
+    if (rerankBandChunks.length > 0 && !gateEligible) {
+      const b = rerankBandChunks[0]
+      console.log(
+        `  ↳ spot-check: chunk "${b.source_title}" @ ${b.similarity.toFixed(3)} is retrieved` +
+          ` but BELOW gating floor → cannot alone justify a pre-payment claim ✓`
+      )
+    }
+
     if (!pass) {
       console.log(`  Class: ${q.failureClass}`)
     }
     console.log()
 
-    results.push({ q, topScore, bestMatch, pass })
+    results.push({ q, topScore, bestMatch, pass, rerankBandCount: rerankBandChunks.length })
   }
 
   // ── Summary table ─────────────────────────────────────────────────────────
@@ -309,6 +346,22 @@ async function main() {
   }
   console.log('─'.repeat(90))
   console.log(`\nResult: ${passed}/${QUERIES.length} queries pass 0.65 threshold`)
+
+  // CLAUDE_PART2.md §6 verification — confirm the retrieve/gate split is working.
+  const queriesWithBand = results.filter((r) => r.rerankBandCount > 0)
+  console.log(
+    `Retrieve-at-0.55 / gate-at-0.65: ${queriesWithBand.length} query(ies) now surface ` +
+      `[0.55, 0.65) chunk(s) to the reranker that were previously dropped at retrieval.`
+  )
+  if (queriesWithBand.length > 0) {
+    console.log(
+      '  These rerank-only chunks do NOT, on their own, justify a pre-payment fightability ' +
+        'claim — gating still requires ≥ 0.65 (enforced in lib/scoring.ts via GATING_FLOOR).'
+    )
+    for (const r of queriesWithBand) {
+      console.log(`  • [${r.q.id}] ${r.q.label}: ${r.rerankBandCount} band chunk(s), gate ${r.pass ? 'eligible' : 'blocked'}`)
+    }
+  }
 
   if (failed.length === 0) {
     console.log('✓ All queries pass — KB retrieval health: GOOD\n')

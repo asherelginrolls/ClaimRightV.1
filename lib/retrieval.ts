@@ -12,6 +12,19 @@ export interface RetrievalResult {
   topScore: number
 }
 
+// CLAUDE_PART2.md §6 — retrieve at 0.55, gate at 0.65.
+//
+// RETRIEVAL_THRESHOLD: the floor passed to the match_kb_chunks RPC. Lowered from
+// 0.65 → 0.55 so genuinely-relevant chunks scoring [0.55, 0.65) still reach the
+// reranker (they were previously dropped at retrieval time, hurting recall).
+//
+// GATING_FLOOR: the floor a chunk must clear before it may, ON ITS OWN, justify a
+// pre-payment fightability claim or citation. A [0.55, 0.65) chunk may inform
+// retrieval/reranking but must NOT by itself produce a pre-payment legal claim.
+// (Post-payment gating is governed by §1 in lib/generation.ts, not by this floor.)
+export const RETRIEVAL_THRESHOLD = 0.55
+export const GATING_FLOOR = 0.65
+
 type MatchKbChunksArgs = {
   query_embedding: number[]
   query_text: string
@@ -26,7 +39,10 @@ export async function retrieveChunks(
     matchCount?: number
   } = {}
 ): Promise<RetrievalResult> {
-  const { matchThreshold = 0.65, matchCount = 10 } = options
+  // Default to RETRIEVAL_THRESHOLD (0.55) so [0.55, 0.65) chunks reach the
+  // reranker — see CLAUDE_PART2.md §6. Pre-payment gating against GATING_FLOOR
+  // (0.65) is enforced by the consumers in lib/scoring.ts, NOT here.
+  const { matchThreshold = RETRIEVAL_THRESHOLD, matchCount = 10 } = options
 
   const queryEmbedding = await embedText(query, 'query')
 

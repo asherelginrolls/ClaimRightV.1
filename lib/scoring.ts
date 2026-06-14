@@ -1,5 +1,5 @@
 import type { ExtractedFacts } from '@/types/api'
-import type { RetrievalResult } from '@/lib/retrieval'
+import { GATING_FLOOR, type RetrievalResult } from '@/lib/retrieval'
 import type { FightabilityScore, FightabilityReason } from '@/types/case'
 
 function clamp(value: number, min: number, max: number): number {
@@ -28,11 +28,12 @@ export function computeNumericScore(
                             [5,  22, 39]
 
   // retrievalQuality: -1 (no chunks) → +1 (topScore = 1.0)
-  // Normalised over the meaningful 0.65–1.0 range; below 0.65 treated as –1.
+  // Normalised over the meaningful GATING_FLOOR–1.0 range; below the gating floor
+  // treated as –1 (a sub-floor chunk does not lift the pre-payment score).
   const topScore = retrieval.topScore
   const retrievalQuality =
     topScore > 0
-      ? clamp((topScore - 0.65) / 0.35, -1, 1)
+      ? clamp((topScore - GATING_FLOOR) / (1 - GATING_FLOOR), -1, 1)
       : -1
 
   // Shift the center by up to 70% of the half-band width in each direction.
@@ -108,7 +109,7 @@ export function calculateFightabilityScore(
 
   const mediumReasons: FightabilityReason[] = []
 
-  if (topScore >= 0.65 && topScore < 0.80 && chunks.length > 0) {
+  if (topScore >= GATING_FLOOR && topScore < 0.80 && chunks.length > 0) {
     mediumReasons.push({
       reason: `A potentially applicable IRDAI regulation was found that may support your dispute (match confidence: ${Math.round(topScore * 100)}%).`,
       citation: buildCitation(chunks[0]),
@@ -122,8 +123,11 @@ export function calculateFightabilityScore(
     })
   }
 
-  // Any tier-2 (precedent) chunk found for this rejection type
-  const precedentChunk = chunks.find((c) => c.tier === 2)
+  // Any tier-2 (precedent) chunk found for this rejection type.
+  // Must clear GATING_FLOOR (0.65): retrieval now surfaces [0.55, 0.65) chunks for
+  // reranking (CLAUDE_PART2.md §6), but a sub-floor precedent must NOT, on its own,
+  // justify a pre-payment fightability claim/citation.
+  const precedentChunk = chunks.find((c) => c.tier === 2 && c.similarity >= GATING_FLOOR)
   if (precedentChunk) {
     mediumReasons.push({
       reason: 'A relevant ombudsman precedent was found for a similar rejection. Past awards can be cited in your dispute letter.',

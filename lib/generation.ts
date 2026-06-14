@@ -128,10 +128,67 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-function removeSentenceContaining(text: string, marker: string): string {
-  const escaped = escapeRegex(marker)
-  const sentencePattern = new RegExp(`[^.!?]*${escaped}[^.!?]*[.!?]?`, 'g')
-  return text.replace(sentencePattern, '').trim()
+// Remove the single sentence a failed/hallucinated citation supports — and ONLY
+// that sentence — together with its inline [Source: ...] marker.
+//
+// Convention (see prompts/category-baselines.ts + GENERATION_SYSTEM_PROMPT): the
+// inline marker FOLLOWS the sentence it supports, e.g. "Claim. [Source: X, §Y]".
+// The previous implementation matched `[^.!?]*<title>[^.!?]*[.!?]?`, but because
+// a [Source: ...] marker contains no sentence terminator, the trailing `[^.!?]*`
+// ran past the bracket into the NEXT sentence — deleting a legitimate following
+// claim, keeping the unsupported one, and orphaning the next claim's real marker.
+//
+// This version anchors on the [Source: ...] bracket (bounded by ']' so removal
+// can never bleed into the next sentence) and consumes the preceding sentence it
+// belongs to. Matching tolerates title/section formatting drift: title first,
+// then section number, then a snippet-overlap fallback for the case where the
+// model omitted the inline marker entirely (so a hallucinated claim can never
+// survive silently).
+function removeClaimForCitation(
+  text: string,
+  citation: { regulation_title: string; section: string; snippet: string }
+): string {
+  const tidy = (s: string): string => s.replace(/\s{2,}/g, ' ').trim()
+
+  const title = escapeRegex(citation.regulation_title.trim())
+  if (title) {
+    const byTitle = new RegExp(`([^.!?]*[.!?]+\\s*)?\\[Source:[^\\]]*${title}[^\\]]*\\]`, 'i')
+    if (byTitle.test(text)) return tidy(text.replace(byTitle, ''))
+  }
+
+  const section = escapeRegex(citation.section.trim())
+  if (section) {
+    const bySection = new RegExp(
+      `([^.!?]*[.!?]+\\s*)?\\[Source:[^\\]]*§?\\s*${section}[^\\]]*\\]`,
+      'i'
+    )
+    if (bySection.test(text)) return tidy(text.replace(bySection, ''))
+  }
+
+  // Fallback: no locatable [Source: ...] marker for this citation. Drop the
+  // sentence whose tokens best overlap the hallucinated snippet.
+  const snippetTokens = tokenize(citation.snippet)
+  if (snippetTokens.size > 0) {
+    const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean)
+    let bestIdx = -1
+    let bestScore = 0
+    sentences.forEach((sentence, i) => {
+      const sTokens = tokenize(sentence)
+      if (sTokens.size === 0) return
+      const overlap =
+        Array.from(snippetTokens).filter((t) => sTokens.has(t)).length / snippetTokens.size
+      if (overlap > bestScore) {
+        bestScore = overlap
+        bestIdx = i
+      }
+    })
+    if (bestIdx >= 0 && bestScore > 0) {
+      sentences.splice(bestIdx, 1)
+      return tidy(sentences.join(' '))
+    }
+  }
+
+  return tidy(text)
 }
 
 function softenLanguage(text: string): string {
@@ -222,8 +279,7 @@ function validateParagraph(
       // Hallucinated chunk_id — not in the retrieved set. This is the ONLY
       // case where we delete the sentence (real fabrication risk).
       counters.failed++
-      const marker = `[Source: ${citation.regulation_title}`
-      validatedText = removeSentenceContaining(validatedText, marker)
+      validatedText = removeClaimForCitation(validatedText, citation)
       validatedCitations.push({ ...citation, overlap: 0, status: 'fail' })
       hadHallucinatedChunk = true
       continue

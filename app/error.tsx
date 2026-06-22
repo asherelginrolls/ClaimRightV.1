@@ -15,37 +15,36 @@ export default function Error({
   }, [error])
 
   return (
-    <main className="min-h-[calc(100vh-8rem)] bg-parchment py-14 px-6">
+    <main className="min-h-[calc(100vh-8rem)] bg-mist px-6 py-14">
       <div className="mx-auto max-w-md py-20 text-center">
-        <div className="rounded-xl border border-red-200 bg-red-50 px-6 py-10">
-          <p className="font-serif text-2xl font-semibold text-red-800">
-            Something went wrong
-          </p>
-          <p className="mt-3 font-sans text-sm text-red-700 leading-relaxed">
-            An unexpected error occurred. Your upload is safe — you can try again
-            or contact us if the problem persists.
+        <div className="rounded-2xl border border-rule bg-paper px-6 py-10 shadow-lift">
+          <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-full bg-sky-tint">
+            <svg className="h-6 w-6 text-blue" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0 3.75h.008M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <p className="font-display text-2xl font-semibold text-ink-deep">Something went wrong</p>
+          <p className="mt-3 font-sans text-sm leading-relaxed text-slate">
+            An unexpected error popped up. Your upload is safe — you can try again, or head back home.
           </p>
           <div className="mt-8 flex flex-col gap-3">
             <button
               onClick={reset}
-              className="w-full rounded-lg bg-red-700 px-4 py-3 font-sans text-sm font-semibold text-white hover:bg-red-800 transition-colors"
+              className="w-full rounded-full bg-blue px-4 py-3 font-sans text-sm font-semibold text-white shadow-lift transition-colors hover:bg-blue-deep"
             >
               Try again
             </button>
             <Link
               href="/"
-              className="w-full rounded-lg border border-red-300 bg-white px-4 py-3 font-sans text-sm font-medium text-red-800 hover:bg-red-50 transition-colors text-center"
+              className="w-full rounded-full border border-rule-strong bg-paper px-4 py-3 text-center font-sans text-sm font-medium text-blue-deep transition-colors hover:border-blue/40"
             >
               Back to home
             </Link>
           </div>
-          <p className="mt-6 font-mono text-[10px] text-red-500">
-            Need help?{' '}
-            <a
-              href="mailto:support@claimright.in"
-              className="underline underline-offset-2 hover:text-red-700"
-            >
-              support@claimright.in
+          <p className="mt-6 font-mono text-[10px] text-slate-faint">
+            Still stuck?{' '}
+            <a href="mailto:support@ashray.in" className="underline underline-offset-2 hover:text-slate">
+              support@ashray.in
             </a>
           </p>
         </div>

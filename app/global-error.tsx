@@ -15,7 +15,7 @@ export default function GlobalError({
 
   return (
     <html lang="en">
-      <body style={{ margin: 0, fontFamily: 'sans-serif', background: '#f5f0e8' }}>
+      <body style={{ margin: 0, fontFamily: 'sans-serif', background: '#F4FAFE' }}>
         <div
           style={{
             minHeight: '100vh',
@@ -30,39 +30,40 @@ export default function GlobalError({
               maxWidth: '400px',
               width: '100%',
               textAlign: 'center',
-              border: '1px solid #fecaca',
-              borderRadius: '12px',
-              background: '#fef2f2',
+              border: '1px solid #E3EEF7',
+              borderRadius: '16px',
+              background: '#FFFFFF',
               padding: '40px 32px',
+              boxShadow: '0 8px 24px -12px rgba(14,42,69,0.18)',
             }}
           >
-            <p style={{ fontSize: '22px', fontWeight: '600', color: '#991b1b', margin: '0 0 12px' }}>
+            <p style={{ fontSize: '22px', fontWeight: 600, color: '#0E2C45', margin: '0 0 12px' }}>
               Something went wrong
             </p>
-            <p style={{ fontSize: '14px', color: '#b91c1c', lineHeight: '1.6', margin: '0 0 28px' }}>
+            <p style={{ fontSize: '14px', color: '#3D5B72', lineHeight: 1.6, margin: '0 0 28px' }}>
               An unexpected error has occurred. Please refresh the page or try again.
             </p>
             <button
               onClick={reset}
               style={{
                 width: '100%',
-                background: '#991b1b',
+                background: '#2C7BC0',
                 color: 'white',
                 border: 'none',
-                borderRadius: '8px',
+                borderRadius: '999px',
                 padding: '12px 16px',
                 fontSize: '14px',
-                fontWeight: '600',
+                fontWeight: 600,
                 cursor: 'pointer',
                 marginBottom: '12px',
               }}
             >
               Try again
             </button>
-            <p style={{ fontSize: '11px', color: '#ef4444', margin: 0 }}>
+            <p style={{ fontSize: '11px', color: '#9CB4C8', margin: 0 }}>
               Persistent issue?{' '}
-              <a href="mailto:support@claimright.in" style={{ color: '#b91c1c' }}>
-                support@claimright.in
+              <a href="mailto:support@ashray.in" style={{ color: '#1F5E97' }}>
+                support@ashray.in
               </a>
             </p>
           </div>

@@ -35,11 +35,10 @@ declare global {
 }
 
 const WHAT_YOU_GET = [
-  'Full point-by-point regulation analysis specific to your rejection',
-  'Formal GRO complaint letter citing your insurer\'s specific IRDAI violations',
-  'Exact regulation clauses (IRDAI circular sections) that apply to your case',
-  'Step-by-step escalation path: GRO → IGMS → Insurance Ombudsman',
-  'Emailed to you as a PDF — download anytime',
+  'A formal dispute letter, written in proper legal English and ready to send to your insurer',
+  'The exact IRDAI rules your insurer broke — each one quoted with its official source',
+  "A clear path in plain words: your insurer's grievance officer → the IRDAI portal → the ombudsman",
+  'Everything emailed to you as a PDF you can download any time',
 ]
 
 export default function PayPage() {
@@ -62,7 +61,7 @@ export default function PayPage() {
     script.id = 'razorpay-script'
     script.src = 'https://checkout.razorpay.com/v1/checkout.js'
     script.onload = () => setScriptLoaded(true)
-    script.onerror = () => setError('Could not load payment module. Please refresh and try again.')
+    script.onerror = () => setError("We couldn't load the payment window. Please refresh and try again.")
     document.body.appendChild(script)
   }, [])
 
@@ -77,7 +76,7 @@ export default function PayPage() {
 
   const handlePayment = useCallback(async () => {
     if (!scriptLoaded) {
-      setError('Payment module not loaded yet. Please wait a moment and try again.')
+      setError('The payment window is still loading. Please wait a moment and try again.')
       return
     }
 
@@ -85,7 +84,6 @@ export default function PayPage() {
     setError(null)
 
     try {
-      // Step 1: create Razorpay order
       const orderRes = await fetch('/api/payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -94,26 +92,24 @@ export default function PayPage() {
       const orderData = (await orderRes.json()) as PaymentOrderResponse & ApiError
 
       if (!orderRes.ok || orderData.error) {
-        setError(orderData.error ?? 'Could not initialise payment. Please try again.')
+        setError(orderData.error ?? "We couldn't start the payment. Please try again.")
         setLoading(false)
         return
       }
 
-      // Step 2: open Razorpay checkout
       const options: RazorpayOptions = {
         key: orderData.keyId,
         amount: orderData.amount,
         currency: orderData.currency,
-        name: 'ClaimRight',
-        description: 'Full Analysis + Dispute Letter',
+        name: 'Ashray',
+        description: 'Full analysis + dispute letter',
         order_id: orderData.orderId,
         prefill: { email },
-        theme: { color: '#1F3B2A' },
+        theme: { color: '#2C7BC0' },
         modal: {
           ondismiss: () => setLoading(false),
         },
         handler: async (response: RazorpayPaymentResponse) => {
-          // Step 3: verify payment server-side
           try {
             const verifyRes = await fetch('/api/payment/verify', {
               method: 'POST',
@@ -125,11 +121,11 @@ export default function PayPage() {
             if (verifyData.success) {
               router.push(`/download/${caseId}`)
             } else {
-              setError(verifyData.error ?? 'Payment verification failed. Please contact support.')
+              setError(verifyData.error ?? "We couldn't confirm your payment. Please contact us.")
               setLoading(false)
             }
           } catch {
-            setError('Payment verification failed. Please contact support.')
+            setError("We couldn't confirm your payment. Please contact us.")
             setLoading(false)
           }
         },
@@ -144,77 +140,81 @@ export default function PayPage() {
   }, [caseId, email, router, scriptLoaded])
 
   return (
-    <main className="min-h-[calc(100vh-8rem)] bg-parchment py-14 px-6">
+    <main className="min-h-[calc(100vh-8rem)] bg-mist px-6 py-14">
       <div className="mx-auto max-w-lg">
-        {/* Back link */}
         <Link
           href={`/analysis/${caseId}`}
-          className="inline-flex items-center gap-1 font-mono text-xs text-ink/50 hover:text-ink transition-colors mb-8"
+          className="mb-8 inline-flex items-center gap-1 font-mono text-xs text-slate-muted transition-colors hover:text-ink"
         >
-          ← Back to analysis
+          ← Back to my result
         </Link>
 
-        {/* Header */}
         <div className="mb-8">
-          <p className="font-mono text-[11px] tracking-widest text-ember uppercase mb-2">
+          <p className="mb-2 font-mono text-[11px] uppercase tracking-[0.22em] text-blue">
             One-time · No subscription
           </p>
-          <h1 className="font-serif text-3xl font-semibold text-ink">
-            Full Analysis + Formal Dispute Letter
+          <h1 className="font-display text-3xl font-semibold text-ink-deep sm:text-4xl">
+            Your full analysis + dispute letter
           </h1>
-          <p className="mt-3 font-sans text-sm text-ink/60 leading-relaxed">
-            Every citation traces to a real, verified IRDAI regulation or ombudsman
-            precedent. No fabrication. Ever.
+          <p className="mt-3 font-sans text-base leading-relaxed text-slate">
+            Everything you need to push back, in language that does the arguing for you. Every line is
+            backed by a real IRDAI rule or ombudsman ruling — nothing invented.
           </p>
         </div>
 
         {/* What you get */}
-        <div className="rounded-xl border border-rule bg-cream px-6 py-5 mb-6">
-          <p className="font-mono text-[10px] tracking-widest text-ink/40 uppercase mb-4">
-            What&apos;s included
+        <div className="mb-6 rounded-2xl border border-rule bg-paper px-6 py-5 shadow-lift">
+          <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.18em] text-slate-faint">
+            What you get
           </p>
-          <ul className="flex flex-col gap-3">
+          <ul className="flex flex-col gap-3.5">
             {WHAT_YOU_GET.map((item, i) => (
               <li key={i} className="flex items-start gap-3">
-                <span className="mt-0.5 flex-shrink-0 w-4 h-4 rounded-full bg-forest/10 flex items-center justify-center">
-                  <span className="block w-1.5 h-1.5 rounded-full bg-forest" />
+                <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-hope/10">
+                  <svg className="h-3 w-3 text-hope" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
                 </span>
-                <span className="font-sans text-sm text-ink/80 leading-relaxed">{item}</span>
+                <span className="font-sans text-sm leading-relaxed text-ink/90">{item}</span>
               </li>
             ))}
           </ul>
         </div>
 
         {/* Price + CTA */}
-        <div className="rounded-xl border border-rule bg-cream px-6 py-6">
-          <div className="flex items-baseline justify-between mb-5">
-            <p className="font-sans text-sm font-medium text-ink/60">Total</p>
-            <p className="font-serif text-4xl font-semibold text-forest">₹99</p>
+        <div className="rounded-2xl border border-rule bg-paper px-6 py-6 shadow-lift">
+          <div className="mb-5 flex items-baseline justify-between">
+            <p className="font-sans text-sm font-medium text-slate">One-time, for this case</p>
+            <p className="font-display text-4xl font-semibold text-ink-deep">₹299</p>
           </div>
 
           {error && (
-            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
-              <p className="font-sans text-sm text-red-700">{error}</p>
+            <div className="mb-4 rounded-xl border border-coral bg-coral/10 px-4 py-3">
+              <p className="font-sans text-sm text-coral-deep">{error}</p>
             </div>
           )}
 
           <button
             onClick={handlePayment}
             disabled={loading || !scriptLoaded}
-            className="w-full rounded-xl bg-forest px-6 py-4 font-sans text-base font-semibold text-white shadow-md hover:bg-forest/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full rounded-full bg-blue px-6 py-4 font-sans text-base font-semibold text-white shadow-lift transition-colors hover:bg-blue-deep disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading ? 'Processing…' : 'Pay ₹99 — Get Full Analysis + Dispute Letter'}
+            {loading ? 'Processing…' : 'Pay ₹299 securely'}
           </button>
 
-          <p className="mt-4 text-center font-mono text-[10px] tracking-wide text-ink/40">
+          <p className="mt-4 text-center font-mono text-[10px] tracking-wide text-slate-faint">
             UPI · Card · Net Banking · Secured by Razorpay
           </p>
         </div>
 
-        {/* Disclaimer */}
-        <p className="mt-8 text-center font-sans text-xs text-ink/30 leading-relaxed">
-          All citations are verified against official IRDAI circulars and ombudsman awards.
-          This is not legal advice and does not constitute legal representation.
+        <p className="mt-6 text-center font-sans text-sm leading-relaxed text-slate">
+          If the letter isn&apos;t useful for your case, reply to your receipt within 7 days and we&apos;ll
+          refund you in full.
+        </p>
+
+        <p className="mt-8 text-center font-sans text-xs leading-relaxed text-slate-faint">
+          Every citation is verified against official IRDAI circulars and ombudsman rulings. Ashray is an
+          informational tool and not legal advice.
         </p>
       </div>
     </main>

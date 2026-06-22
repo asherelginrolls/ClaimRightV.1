@@ -69,7 +69,7 @@ export async function POST(
   try {
     const order = await Promise.race([
       razorpay.orders.create({
-        amount: 9900,
+        amount: 29900,
         currency: 'INR',
         receipt: caseId.slice(0, 40),
         notes: { caseId },
@@ -83,7 +83,7 @@ export async function POST(
 
     return NextResponse.json({
       orderId: order.id,
-      amount: 9900,
+      amount: 29900,
       currency: 'INR',
       keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
     })

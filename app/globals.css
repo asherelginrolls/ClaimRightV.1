@@ -3,14 +3,18 @@
 @tailwind utilities;
 
 :root {
-  --background: #F5F1E8;
-  --foreground: #14181A;
+  --background: #F4FAFE;
+  --foreground: #0E2C45;
+}
+
+html {
+  background: var(--background);
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: "Inter", system-ui, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -18,5 +22,22 @@ body {
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  /* Devanagari brand mark — आश्रय */
+  .mark-devanagari {
+    font-family: var(--font-sans), system-ui, sans-serif;
+    letter-spacing: 0.18em;
+  }
+}
+
+/* Respect reduced-motion: freeze parallax/animation to a calm static frame. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }

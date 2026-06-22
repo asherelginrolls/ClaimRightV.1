@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { redaction, redactionDecay, plexSans, plexMono } from "./typography";
+import { Wordmark } from "./components/Wordmark";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ClaimRight — Fight Your Insurance Rejection",
+  title: "Ashray — Your health claim was rejected. You still have options.",
   description:
-    "AI-powered health insurance dispute co-pilot for India. Upload your rejection letter, get verified IRDAI-based grounds to fight back.",
+    "Ashray reads your health insurance rejection letter, checks it against IRDAI rules and real ombudsman rulings, and tells you plainly whether you can fight it — and exactly what to do next.",
 };
 
 export default function RootLayout({
@@ -15,40 +18,32 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" style={{ background: "#F5F1E8" }}>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className="min-h-screen bg-parchment text-ink">
-        <nav className="border-b border-rule bg-cream">
-          <div className="mx-auto max-w-5xl flex items-center justify-between px-6 py-4">
-            <a href="/" className="flex items-center gap-2">
-              <span className="font-serif text-xl font-semibold text-forest">
-                ClaimRight
-              </span>
-              <span className="font-mono text-[10px] font-medium tracking-widest text-ember uppercase">
-                Beta
-              </span>
-            </a>
+    <html
+      lang="en"
+      className={`${redaction.variable} ${redactionDecay.variable} ${plexSans.variable} ${plexMono.variable}`}
+    >
+      <body className="min-h-screen bg-mist font-sans text-ink antialiased">
+        <header className="sticky top-0 z-50 border-b border-rule/80 bg-paper/70 backdrop-blur-md">
+          <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
+            <Wordmark />
+            <Link
+              href="/upload"
+              className="rounded-full border border-rule-strong bg-paper px-4 py-2 font-sans text-sm font-semibold text-blue-deep shadow-sm transition-colors hover:border-blue/40 hover:text-blue"
+            >
+              Check my claim →
+            </Link>
           </div>
-        </nav>
+        </header>
+
         {children}
-        <footer className="border-t border-rule bg-cream">
-          <div className="mx-auto max-w-5xl px-6 py-8 text-center">
-            <p className="font-mono text-[11px] tracking-widest text-ink/50 uppercase">
-              Not a law firm · Not legal advice · IRDAI-based guidance only
+
+        <footer className="border-t border-rule bg-paper">
+          <div className="mx-auto max-w-6xl px-6 py-10 text-center">
+            <p className="font-mono text-[11px] tracking-[0.18em] text-slate-muted uppercase">
+              Ashray · आश्रय · Built in India · 2026
             </p>
-            <p className="mt-2 font-sans text-xs text-ink/40">
-              © 2026 ClaimRight
+            <p className="mt-2 font-mono text-[11px] tracking-[0.14em] text-slate-faint uppercase">
+              Not a law firm · Informational tool · Not legal advice
             </p>
           </div>
         </footer>

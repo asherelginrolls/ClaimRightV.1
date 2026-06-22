@@ -1,0 +1,12 @@
+Redaction — typeface by Forest Young & Jeremy Mickel (MCKL).
+Created for "Redaction", a project by Titus Kaphar & Reginald Dwayne Betts.
+
+Licensed under the SIL Open Font License, Version 1.1.
+Full license text: https://openfontlicense.org/open-font-license-official-text/
+
+"Redaction" is a Reserved Font Name under the OFL. The font files in this
+directory (Redaction-Regular.woff, Redaction-Bold.woff, Redaction35-Regular.woff)
+are redistributed unmodified under the OFL, which permits embedding in and
+bundling with this software, including for commercial use.
+
+Source: https://redaction.us  ·  https://usemodify.com/fonts/redaction/

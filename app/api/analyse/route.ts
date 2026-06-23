@@ -4,7 +4,7 @@ import { ensureOcrForDocs, downloadAndOcr } from '@/lib/ocr-docs'
 import { haiku } from '@/lib/claude'
 import { EXTRACTION_SYSTEM_PROMPT, EXTRACTION_USER_PROMPT } from '@/prompts/extraction'
 import { retrieveForCase } from '@/lib/retrieval'
-import { calculateFightabilityScore, computeNumericScore } from '@/lib/scoring'
+import { defaultScorer } from '@/lib/scoring'
 import { ExtractedFactsSchema } from '@/types/api'
 import type { AnalyseResponse, ApiError } from '@/types/api'
 import type { RejectionCategory, EvidenceSummary, SupportingDocFacts, DocType } from '@/types/case'
@@ -646,10 +646,15 @@ export async function GET(
     })
     console.info('[analyse] stage: retrieval-end chunks=' + retrievalResult.chunks.length)
 
-    // ── 5. Fightability scoring (rules-based) ─────────────────────────────
+    // ── 5. Fightability scoring (rules-based, via the Scorer strategy) ─────
+    // defaultScorer is RuleBasedScorer (output identical to V1); it also emits
+    // the feature vector we persist below so a labeled dataset can accumulate
+    // for the eventual learned scorer (see lib/scoring.ts + scripts/scoring-report.ts).
     const factsForScoring = { ...extractedFacts, policy_age_months: derivedPolicyAge }
-    const { score, reasons } = calculateFightabilityScore(factsForScoring, retrievalResult)
-    const numericScore = computeNumericScore(retrievalResult, score)
+    const { score, reasons, numeric: numericScore, features } = defaultScorer.score(
+      factsForScoring,
+      retrievalResult
+    )
     console.info('[analyse] stage: scoring-done score=' + score + ' numeric=' + numericScore)
 
     // ── 6+7. Evidence explainers + point-by-point in ONE Haiku call ───────
@@ -687,6 +692,11 @@ export async function GET(
       fightability_numeric: numericScore,
       evidence_summaries: evidenceSummaries,
       point_by_point_analysis: pointByPointAnalysis,
+      // Scoring-evolution capture (zero marginal cost — builds the dataset).
+      features: features as unknown as Record<string, unknown>,
+      predicted_score: score,
+      predicted_numeric: numericScore,
+      scorer_version: defaultScorer.version,
     }
 
     console.info('[analyse] stage: db-write-start')

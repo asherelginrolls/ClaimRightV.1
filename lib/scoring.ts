@@ -1,6 +1,6 @@
 import type { ExtractedFacts } from '@/types/api'
 import { GATING_FLOOR, type RetrievalResult } from '@/lib/retrieval'
-import type { FightabilityScore, FightabilityReason } from '@/types/case'
+import type { FightabilityScore, FightabilityReason, RejectionCategory } from '@/types/case'
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max)
@@ -160,3 +160,139 @@ export function calculateFightabilityScore(
     reasons: [lowReason],
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCORER STRATEGY INTERFACE (CLAUDE_PART2 scoring-evolution foundation)
+//
+// We currently have ZERO outcome labels, so training a model is premature
+// (CLAUDE.md: "bottoms-up, never estimate"). Instead we make scoring *swappable*
+// and *measurable* without changing any user-facing behavior:
+//
+//   • RuleBasedScorer below is a thin wrapper over the EXACT same
+//     calculateFightabilityScore + computeNumericScore above. It stays the
+//     production default — output is byte-for-byte identical to V1.
+//   • It additionally emits a flat, typed `features` vector — the precise input
+//     a future learned Scorer would consume. /api/analyse persists this on every
+//     case so a labeled dataset accumulates at zero marginal cost.
+//
+// A model is only justified once scripts/scoring-report.ts shows enough labeled
+// cases per band. Until then, RuleBasedScorer is in charge.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const REJECTION_CATEGORIES: readonly RejectionCategory[] = [
+  'pre_existing_condition',
+  'policy_exclusion',
+  'documentation_incomplete',
+  'non_disclosure',
+  'waiting_period',
+  'cashless_denial',
+  'experimental_treatment',
+  'fraud_suspected',
+  'other',
+]
+
+/**
+ * Flat, typed feature vector capturing every signal the rules engine uses.
+ * Numeric `-1` is the explicit "unknown / not provided" sentinel for the two
+ * optional integer inputs (documents_requested_count, policy_age_months) and
+ * days_since_rejection; paired booleans expose the thresholds the rules apply.
+ * This is the exact vector a future learned Scorer will consume.
+ */
+export interface ScoringFeatures {
+  topScore: number
+  chunkCount: number
+  topScoreAboveGatingFloor: boolean
+  documentsRequestedCount: number
+  documentsRequestedMultiple: boolean
+  policyAgeMonths: number
+  policyAgeOver60: boolean
+  daysSinceRejection: number
+  tier2PrecedentFound: boolean
+  // category one-hots
+  cat_pre_existing_condition: boolean
+  cat_policy_exclusion: boolean
+  cat_documentation_incomplete: boolean
+  cat_non_disclosure: boolean
+  cat_waiting_period: boolean
+  cat_cashless_denial: boolean
+  cat_experimental_treatment: boolean
+  cat_fraud_suspected: boolean
+  cat_other: boolean
+}
+
+export interface ScorerOutput {
+  score: FightabilityScore
+  reasons: FightabilityReason[]
+  numeric: number
+  features: ScoringFeatures
+}
+
+export interface Scorer {
+  /** Persisted on each case as `scorer_version` so outcomes are attributable. */
+  readonly version: string
+  score(facts: ExtractedFacts, retrieval: RetrievalResult): ScorerOutput
+}
+
+/** Whole days between rejection_date and `now`; -1 when unknown/unparseable. */
+export function daysSinceRejection(rejectionDate: string | null, now: Date = new Date()): number {
+  if (!rejectionDate) return -1
+  const then = new Date(rejectionDate)
+  if (Number.isNaN(then.getTime())) return -1
+  const days = Math.floor((now.getTime() - then.getTime()) / 86_400_000)
+  return days >= 0 ? days : -1
+}
+
+export function buildScoringFeatures(
+  facts: ExtractedFacts,
+  retrieval: RetrievalResult,
+  now: Date = new Date()
+): ScoringFeatures {
+  const category = facts.rejection_reason_category
+  const docCount = facts.documents_requested_count ?? -1
+  const policyAge = facts.policy_age_months ?? -1
+  const oneHot = (c: RejectionCategory): boolean => category === c
+
+  return {
+    topScore: retrieval.topScore,
+    chunkCount: retrieval.chunks.length,
+    topScoreAboveGatingFloor: retrieval.topScore >= GATING_FLOOR,
+    documentsRequestedCount: docCount,
+    documentsRequestedMultiple: docCount >= 2,
+    policyAgeMonths: policyAge,
+    policyAgeOver60: policyAge >= 60,
+    daysSinceRejection: daysSinceRejection(facts.rejection_date, now),
+    tier2PrecedentFound: retrieval.chunks.some((c) => c.tier === 2 && c.similarity >= GATING_FLOOR),
+    cat_pre_existing_condition: oneHot('pre_existing_condition'),
+    cat_policy_exclusion: oneHot('policy_exclusion'),
+    cat_documentation_incomplete: oneHot('documentation_incomplete'),
+    cat_non_disclosure: oneHot('non_disclosure'),
+    cat_waiting_period: oneHot('waiting_period'),
+    cat_cashless_denial: oneHot('cashless_denial'),
+    cat_experimental_treatment: oneHot('experimental_treatment'),
+    cat_fraud_suspected: oneHot('fraud_suspected'),
+    cat_other: oneHot('other'),
+  }
+}
+
+/**
+ * The current production scorer. Delegates verbatim to the V1 rules functions
+ * so behavior is unchanged; adds the feature vector for dataset capture.
+ */
+export class RuleBasedScorer implements Scorer {
+  readonly version = 'rules-v1'
+
+  score(facts: ExtractedFacts, retrieval: RetrievalResult): ScorerOutput {
+    const { score, reasons } = calculateFightabilityScore(facts, retrieval)
+    const numeric = computeNumericScore(retrieval, score)
+    const features = buildScoringFeatures(facts, retrieval)
+    return { score, reasons, numeric, features }
+  }
+}
+
+// Single shared default — swap this binding (not the call sites) when a learned
+// Scorer is eventually justified by scripts/scoring-report.ts calibration data.
+export const defaultScorer: Scorer = new RuleBasedScorer()
+
+// Keep REJECTION_CATEGORIES referenced (it documents the canonical one-hot order
+// for downstream model tooling and guards against the enum drifting).
+export const SCORING_CATEGORY_ORDER = REJECTION_CATEGORIES

@@ -1,0 +1,138 @@
+{
+  "info": {
+    "_postman_id": "c1a1b2c3-0000-4000-8000-claimright001",
+    "name": "ClaimRight API (smoke)",
+    "description": "Manual smoke collection for ClaimRight's public API routes. Run against a local `npm run dev` server (http://localhost:3000). Walk the flow top-to-bottom: Upload -> Analyse -> Payment -> Verify -> Generate -> Download. This is for clicking through by hand; it does NOT replace the Vitest suite (`npm test`).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "caseId", "value": "" },
+    { "key": "orderId", "value": "" },
+    { "key": "paymentId", "value": "" },
+    { "key": "signature", "value": "" },
+    { "key": "adminSecret", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Upload (POST /api/upload)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "files", "type": "file", "src": [], "description": "Rejection letter PDF/JPG/PNG (required). Select a real file." },
+            { "key": "doc_types", "value": "rejection_letter", "type": "text" },
+            { "key": "email", "value": "you@example.com", "type": "text" },
+            { "key": "turnstile_token", "value": "", "type": "text", "description": "Leave blank in dev (Turnstile is skipped when TURNSTILE_SECRET_KEY is unset)." }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/upload",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "upload"]
+        },
+        "description": "Creates a case. Copy the returned caseId into the {{caseId}} collection variable."
+      }
+    },
+    {
+      "name": "2. Analyse (GET /api/analyse)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/analyse?caseId={{caseId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "analyse"],
+          "query": [{ "key": "caseId", "value": "{{caseId}}" }]
+        },
+        "description": "Runs OCR + extraction + retrieval + rules scoring. Returns the fightability band, numeric score, evidence cards and point-by-point analysis."
+      }
+    },
+    {
+      "name": "3. Create payment order (POST /api/payment)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"caseId\": \"{{caseId}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/payment",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "payment"]
+        },
+        "description": "Creates a ₹299 Razorpay order (TEST mode). Copy orderId into {{orderId}}."
+      }
+    },
+    {
+      "name": "4. Verify payment (POST /api/payment/verify)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"razorpay_order_id\": \"{{orderId}}\",\n  \"razorpay_payment_id\": \"{{paymentId}}\",\n  \"razorpay_signature\": \"{{signature}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/payment/verify",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "payment", "verify"]
+        },
+        "description": "Verifies the Razorpay HMAC signature and flips the case to 'paid'. The payment_id + signature come from the Razorpay checkout callback (use the Razorpay TEST checkout to obtain real values)."
+      }
+    },
+    {
+      "name": "5. Generate dispute letter (POST /api/generate)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"caseId\": \"{{caseId}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/generate",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "generate"]
+        },
+        "description": "Post-payment only — returns 403 unless the case status is 'paid'. Runs the citation-gated generation pipeline."
+      }
+    },
+    {
+      "name": "6. Download letter (GET /api/download/:caseId)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/download/{{caseId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "download", "{{caseId}}"]
+        },
+        "description": "Polls for / returns the generated dispute letter PDF for a paid case."
+      }
+    },
+    {
+      "name": "Admin: record outcome (POST /api/admin/outcome)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{adminSecret}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"caseId\": \"{{caseId}}\",\n  \"outcome\": \"won\",\n  \"outcome_stage\": \"ombudsman\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/outcome",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "admin", "outcome"]
+        },
+        "description": "Admin-only (Bearer ADMIN_SECRET). Records the real dispute outcome so the scoring calibration dataset can accumulate. outcome ∈ won|partial|lost|withdrawn|unknown; outcome_stage ∈ gro|igms|ombudsman|court."
+      }
+    }
+  ]
+}

@@ -115,7 +115,7 @@ function tokenize(text: string): Set<string> {
   )
 }
 
-function tokenOverlapCoefficient(snippet: string, chunkText: string): number {
+export function tokenOverlapCoefficient(snippet: string, chunkText: string): number {
   const snippetTokens = tokenize(snippet)
   const chunkTokens = tokenize(chunkText)
   if (snippetTokens.size === 0) return 0
@@ -262,7 +262,7 @@ function countValidCitations(paragraphs: ValidatedParagraph[]): number {
 // the pre-payment behavior — once a user has paid, we never punch holes in
 // the letter for low-overlap snippets; we only excise outright fabrications.
 
-function validateParagraph(
+export function validateParagraph(
   para: { text: string; citations: Citation[] },
   chunkMap: Map<string, KbSearchResult>,
   counters: { total: number; failed: number; flagged: number }

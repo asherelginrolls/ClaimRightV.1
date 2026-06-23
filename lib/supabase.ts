@@ -37,6 +37,13 @@ export type Database = {
           razorpay_order_id: string | null
           razorpay_payment_id: string | null
           paid_at: string | null
+          features: Record<string, unknown> | null
+          predicted_score: 'low' | 'medium' | 'strong' | null
+          predicted_numeric: number | null
+          scorer_version: string | null
+          outcome: 'won' | 'partial' | 'lost' | 'withdrawn' | 'unknown'
+          outcome_stage: 'gro' | 'igms' | 'ombudsman' | 'court' | null
+          outcome_recorded_at: string | null
         }
         Insert: {
           id?: string
@@ -68,6 +75,13 @@ export type Database = {
           razorpay_order_id?: string | null
           razorpay_payment_id?: string | null
           paid_at?: string | null
+          features?: Record<string, unknown> | null
+          predicted_score?: 'low' | 'medium' | 'strong' | null
+          predicted_numeric?: number | null
+          scorer_version?: string | null
+          outcome?: 'won' | 'partial' | 'lost' | 'withdrawn' | 'unknown'
+          outcome_stage?: 'gro' | 'igms' | 'ombudsman' | 'court' | null
+          outcome_recorded_at?: string | null
         }
         Update: {
           id?: string
@@ -99,6 +113,13 @@ export type Database = {
           razorpay_order_id?: string | null
           razorpay_payment_id?: string | null
           paid_at?: string | null
+          features?: Record<string, unknown> | null
+          predicted_score?: 'low' | 'medium' | 'strong' | null
+          predicted_numeric?: number | null
+          scorer_version?: string | null
+          outcome?: 'won' | 'partial' | 'lost' | 'withdrawn' | 'unknown'
+          outcome_stage?: 'gro' | 'igms' | 'ombudsman' | 'court' | null
+          outcome_recorded_at?: string | null
         }
       }
       case_documents: {

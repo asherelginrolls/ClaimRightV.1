@@ -34,6 +34,10 @@ export interface PaymentOrderResponse {
   keyId: string
 }
 
+export interface DeepAnalyseResponse {
+  pointByPointAnalysis: string[]
+}
+
 export interface GenerateResponse {
   caseId: string
   letterPath: string | null

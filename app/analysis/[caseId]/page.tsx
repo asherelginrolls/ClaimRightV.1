@@ -3,53 +3,14 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import type { AnalyseResponse } from '@/types/api'
+import type { AnalyseResponse, DeepAnalyseResponse } from '@/types/api'
 
 function formatRupees(amount: number): string {
   return `₹${amount.toLocaleString('en-IN')}`
 }
 
-// ── Hopeful score bands ──────────────────────────────────────────────────────
-// Mapped off the 0–100 number the backend already returns. Tuned for hope:
-// even a weak case reads as "here's your path", never a red alarm.
-interface Band {
-  label: string
-  color: string
-  head: string
-  chip: string
-}
-function hopefulBand(score: number): Band {
-  if (score >= 72)
-    return {
-      label: 'Highly fightable',
-      color: '#1E9E73',
-      head: 'This looks like a strong case worth pursuing.',
-      chip: 'bg-hope/10 text-hope',
-    }
-  if (score >= 52)
-    return {
-      label: 'Fightable',
-      color: '#E0A21E',
-      head: 'You have a real case here.',
-      chip: 'bg-sun/20 text-gold',
-    }
-  if (score >= 36)
-    return {
-      label: 'Worth a letter',
-      color: '#F4A98C',
-      head: 'Borderline — but it costs very little to try.',
-      chip: 'bg-coral/20 text-coral-deep',
-    }
-  return {
-    label: 'Difficult as it stands',
-    color: '#E7886F',
-    head: 'Harder under the current rules — but here is your path forward.',
-    chip: 'bg-slate-faint/20 text-slate',
-  }
-}
-
 // ── Radial progress arc (SVG, no chart library) ─────────────────────────────
-// 270° arc, gap centred at the bottom; stroke colour follows the hopeful band.
+// 270° arc: starts at 135° (bottom-left), sweeps clockwise to 45° (bottom-right).
 function RadialScore({ score }: { score: number }) {
   const r = 48
   const cx = 60
@@ -58,7 +19,11 @@ function RadialScore({ score }: { score: number }) {
   const arcLength = circumference * 0.75
   const filled = arcLength * (score / 100)
   const gap = arcLength - filled
-  const strokeColor = hopefulBand(score).color
+
+  let strokeColor = '#9B4B2A'
+  if (score >= 70) strokeColor = '#1f3b2a'
+  else if (score >= 40) strokeColor = '#d97706'
+
   const rotation = 135
 
   return (
@@ -69,7 +34,7 @@ function RadialScore({ score }: { score: number }) {
           cy={cy}
           r={r}
           fill="none"
-          stroke="#E3EEF7"
+          stroke="#e5e0d8"
           strokeWidth="10"
           strokeDasharray={`${arcLength} ${circumference - arcLength}`}
           strokeDashoffset={0}
@@ -87,70 +52,48 @@ function RadialScore({ score }: { score: number }) {
           strokeDashoffset={0}
           strokeLinecap="round"
           transform={`rotate(${rotation} ${cx} ${cy})`}
-          style={{ transition: 'stroke-dasharray 0.8s cubic-bezier(0.22,1,0.36,1)' }}
+          style={{ transition: 'stroke-dasharray 0.6s ease' }}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-display text-3xl font-semibold leading-none text-ink-deep">{score}</span>
-        <span className="mt-0.5 font-mono text-[9px] uppercase tracking-widest text-slate-faint">/100</span>
+        <span className="font-serif text-2xl font-semibold text-ink leading-none">{score}</span>
+        <span className="font-mono text-[9px] tracking-widest text-ink/40 uppercase mt-0.5">/100</span>
       </div>
     </div>
   )
 }
 
-const ANALYSE_STEPS = [
-  'Reading your rejection letter',
-  'Matching IRDAI rules & ombudsman rulings',
-  'Checking the timeline against the law',
-  'Scoring how fightable your case is',
-]
+const bandConfig = {
+  strong: {
+    label: 'Strong Case',
+    labelColor: 'text-[#1f3b2a]',
+    badgeBg: 'bg-[#1f3b2a]',
+    badgeText: 'text-white',
+  },
+  medium: {
+    label: 'Worth Fighting',
+    labelColor: 'text-amber-700',
+    badgeBg: 'bg-amber-600',
+    badgeText: 'text-white',
+  },
+  low: {
+    label: 'Difficult Case',
+    labelColor: 'text-[#9B4B2A]',
+    badgeBg: 'bg-[#9B4B2A]',
+    badgeText: 'text-white',
+  },
+}
 
 function LoadingState() {
-  const [step, setStep] = useState(0)
-  useEffect(() => {
-    const id = setInterval(() => setStep((s) => (s < ANALYSE_STEPS.length - 1 ? s + 1 : s)), 1700)
-    return () => clearInterval(id)
-  }, [])
   return (
-    <div className="mx-auto flex min-h-[55vh] max-w-md flex-col items-center justify-center gap-7 text-center">
-      <div className="h-12 w-12 animate-sunpulse rounded-full bg-sun shadow-glow" />
+    <div className="flex min-h-[50vh] flex-col items-center justify-center gap-5 text-center">
+      <div className="h-10 w-10 rounded-full border-4 border-rule border-t-forest animate-spin" />
       <div>
-        <p className="font-display text-2xl text-ink-deep">Reading your case.</p>
-        <p className="mt-2 font-sans text-sm text-slate">
-          We&apos;re working through it the way a careful advisor would.
+        <p className="font-serif text-xl text-ink">Analysing your document...</p>
+        <p className="mt-2 font-mono text-xs text-ink/50 tracking-wide">
+          Reading IRDAI regulations · Checking ombudsman awards · Calculating your score
         </p>
       </div>
-      <ul className="flex w-full flex-col gap-2.5 text-left">
-        {ANALYSE_STEPS.map((label, i) => {
-          const done = step > i
-          const active = step === i
-          return (
-            <li key={label} className="flex items-center gap-3">
-              <span
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${
-                  done
-                    ? 'border-hope bg-hope text-white'
-                    : active
-                    ? 'animate-blink border-blue bg-paper'
-                    : 'border-rule-strong bg-paper'
-                }`}
-              >
-                {done && (
-                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-              </span>
-              <span className={`font-sans text-sm ${done ? 'text-ink-deep' : active ? 'text-blue-deep' : 'text-slate-faint'}`}>
-                {label}
-              </span>
-            </li>
-          )
-        })}
-      </ul>
-      <p className="font-mono text-[10px] tracking-wide text-slate-faint">
-        Every finding will be traced to a real source. Nothing invented.
-      </p>
     </div>
   )
 }
@@ -158,12 +101,12 @@ function LoadingState() {
 function ErrorState({ message }: { message: string }) {
   return (
     <div className="mx-auto max-w-md py-20 text-center">
-      <div className="rounded-2xl border border-rule bg-paper px-6 py-8 shadow-lift">
-        <p className="font-display text-xl font-semibold text-ink-deep">We hit a snag</p>
-        <p className="mt-2 font-sans text-sm text-slate">{message}</p>
+      <div className="rounded-xl border border-red-200 bg-red-50 px-6 py-8">
+        <p className="font-serif text-lg font-semibold text-red-800">Analysis failed</p>
+        <p className="mt-2 font-sans text-sm text-red-700">{message}</p>
         <Link
           href="/upload"
-          className="mt-6 inline-flex items-center gap-1 rounded-full border border-rule-strong bg-paper px-5 py-2.5 font-sans text-sm font-medium text-blue-deep transition-colors hover:border-blue/40"
+          className="mt-6 inline-flex items-center gap-1 rounded-lg border border-red-300 bg-white px-4 py-2 font-sans text-sm font-medium text-red-800 hover:bg-red-50 transition-colors"
         >
           ← Try again
         </Link>
@@ -180,24 +123,38 @@ export default function AnalysisPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 120_000)
+  // DEEP analysis state — fills in after the fast result renders
+  const [deepBullets, setDeepBullets] = useState<string[] | null>(null)
+  const [deepLoading, setDeepLoading] = useState(false)
 
-    async function fetchAnalysis() {
+  // FAST fetch — should return in <15s now that OCR runs at upload time
+  useEffect(() => {
+    if (!caseId) return
+    const controller = new AbortController()
+    // 30s timeout for FAST path (up from 55s; if background OCR ran, this
+    // should complete in ~5–10s)
+    const timeout = setTimeout(() => controller.abort(), 30_000)
+
+    async function fetchFast() {
       try {
         const res = await fetch(`/api/analyse?caseId=${caseId}`, { signal: controller.signal })
         const data = (await res.json()) as AnalyseResponse & { error?: string }
         if (!res.ok || data.error) {
-          setError(data.error ?? "The analysis didn't complete. Please try again.")
+          setError(data.error ?? 'Analysis failed. Please try again.')
         } else {
           setResult(data)
+          // Seed deep bullets from cache if fast result already includes them
+          if (Array.isArray(data.pointByPointAnalysis) && data.pointByPointAnalysis.length > 0) {
+            setDeepBullets(data.pointByPointAnalysis)
+          }
         }
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') {
-          setError('This is taking longer than expected. Refresh the page to try again.')
+          setError(
+            'Analysis is taking longer than usual — your document may still be processing. Refresh in a moment to try again.'
+          )
         } else {
-          setError("We couldn't reach the server. Please check your connection.")
+          setError('Could not reach the server. Please check your connection.')
         }
       } finally {
         clearTimeout(timeout)
@@ -205,30 +162,80 @@ export default function AnalysisPage() {
       }
     }
 
-    if (caseId) fetchAnalysis()
+    void fetchFast()
     return () => {
       clearTimeout(timeout)
       controller.abort()
     }
   }, [caseId])
 
+  // DEEP fetch — fires after the fast result renders (or immediately if already
+  // cached from a previous visit)
+  useEffect(() => {
+    if (!result || deepBullets !== null) return
+    setDeepLoading(true)
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 55_000)
+
+    fetch(`/api/analyse?caseId=${caseId}&phase=deep`, { signal: controller.signal })
+      .then((r) => r.json())
+      .then((data: DeepAnalyseResponse & { error?: string }) => {
+        if (Array.isArray(data.pointByPointAnalysis)) {
+          setDeepBullets(data.pointByPointAnalysis)
+        }
+      })
+      .catch(() => {
+        // Graceful: page is usable without the deep result
+      })
+      .finally(() => {
+        clearTimeout(timeout)
+        setDeepLoading(false)
+      })
+
+    return () => {
+      clearTimeout(timeout)
+      controller.abort()
+    }
+  }, [result, caseId, deepBullets])
+
   return (
-    <main className="min-h-[calc(100vh-8rem)] bg-mist px-6 py-14">
+    <main className="min-h-[calc(100vh-8rem)] bg-parchment py-14 px-6">
       {loading && <LoadingState />}
       {!loading && error && <ErrorState message={error} />}
-      {!loading && result && <ResultView result={result} caseId={caseId} />}
+      {!loading && result && (
+        <ResultView
+          result={result}
+          caseId={caseId}
+          deepBullets={deepBullets}
+          deepLoading={deepLoading}
+        />
+      )}
     </main>
   )
 }
 
-function ResultView({ result, caseId }: { result: AnalyseResponse; caseId: string }) {
+function ResultView({
+  result,
+  caseId,
+  deepBullets,
+  deepLoading,
+}: {
+  result: AnalyseResponse
+  caseId: string
+  deepBullets: string[] | null
+  deepLoading: boolean
+}) {
+  const band = result.fightabilityScore
+  const config = bandConfig[band]
   const numericScore = result.fightabilityNumeric ?? 40
-  const band = hopefulBand(numericScore)
-  const isDifficult = numericScore < 36
   const evidenceSummaries = result.evidenceSummaries ?? []
-  const regulationCount = result.regulationMatchCount ?? evidenceSummaries.filter((e) => e.tier === 1).length
-  const precedentCount = result.precedentMatchCount ?? evidenceSummaries.filter((e) => e.tier === 2).length
-  const pointByPoint = result.pointByPointAnalysis ?? []
+  const regulationCount =
+    result.regulationMatchCount ?? evidenceSummaries.filter((e) => e.tier === 1).length
+  const precedentCount =
+    result.precedentMatchCount ?? evidenceSummaries.filter((e) => e.tier === 2).length
+
+  // Use deep bullets when available; fall back to fast-path bullets (cached visits)
+  const pointByPoint = deepBullets ?? result.pointByPointAnalysis ?? []
   const visibleBullets = pointByPoint.slice(0, 3)
   const blurredBullets = pointByPoint.slice(3, 6)
 
@@ -236,77 +243,91 @@ function ResultView({ result, caseId }: { result: AnalyseResponse; caseId: strin
     <div className="mx-auto max-w-2xl">
       <Link
         href="/upload"
-        className="mb-8 inline-flex items-center gap-1 font-mono text-xs text-slate-muted transition-colors hover:text-ink"
+        className="inline-flex items-center gap-1 font-mono text-xs text-ink/50 hover:text-ink transition-colors mb-8"
       >
-        ← Check another claim
+        ← Upload another
       </Link>
 
-      {/* ── Score hero ── */}
-      <div className="rounded-3xl border border-rule bg-paper px-8 py-8 shadow-lift">
-        <div className="flex flex-col items-center gap-5 sm:flex-row sm:gap-8">
+      {/* ── 1. Numeric score hero ─────────────────────────────────────────── */}
+      <div className="rounded-2xl border border-rule bg-cream px-8 py-8">
+        <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:gap-8">
           <RadialScore score={numericScore} />
           <div className="flex-1 text-center sm:text-left">
-            <span className={`inline-block rounded-full px-3 py-1 font-mono text-xs font-semibold tracking-wide ${band.chip}`}>
-              {band.label}
-            </span>
-            <p className="mt-2.5 font-display text-2xl font-semibold leading-snug text-ink-deep">
-              {band.head}
+            <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start mb-2">
+              <span
+                className={`rounded-full px-3 py-1 font-mono text-xs font-semibold tracking-wide ${config.badgeBg} ${config.badgeText}`}
+              >
+                {config.label}
+              </span>
+            </div>
+            <p className={`font-serif text-2xl font-semibold leading-tight ${config.labelColor}`}>
+              {numericScore} / 100 — {config.label}
             </p>
             {result.insurer && (
-              <p className="mt-1.5 font-sans text-sm text-slate">
+              <p className="mt-1 font-sans text-sm text-ink/60">
                 {result.insurer}
                 {result.claimAmount !== null && <> · {formatRupees(result.claimAmount)}</>}
               </p>
             )}
             {!result.insurer && result.claimAmount !== null && (
-              <p className="mt-1.5 font-sans text-sm text-slate">Claim: {formatRupees(result.claimAmount)}</p>
+              <p className="mt-1 font-sans text-sm text-ink/60">
+                Claim: {formatRupees(result.claimAmount)}
+              </p>
             )}
           </div>
         </div>
       </div>
 
-      {/* ── Match counters ── */}
+      {/* ── 2. Regulation / precedent counters ────────────────────────────── */}
       {(regulationCount > 0 || precedentCount > 0) && (
-        <div className="mt-4 rounded-2xl border border-blue/15 bg-sky-tint/60 px-6 py-4 text-center">
-          <p className="font-sans text-sm font-medium text-blue-deep">
+        <div className="mt-4 rounded-xl border border-forest/20 bg-forest/5 px-6 py-4 text-center">
+          <p className="font-sans text-sm font-medium text-forest">
             We matched{' '}
             {regulationCount > 0 && (
-              <strong>{regulationCount} IRDAI rule{regulationCount !== 1 ? 's' : ''}</strong>
+              <strong>
+                {regulationCount} IRDAI regulation{regulationCount !== 1 ? 's' : ''}
+              </strong>
             )}
             {regulationCount > 0 && precedentCount > 0 && ' and '}
             {precedentCount > 0 && (
-              <strong>{precedentCount} ombudsman ruling{precedentCount !== 1 ? 's' : ''}</strong>
+              <strong>
+                {precedentCount} ombudsman precedent{precedentCount !== 1 ? 's' : ''}
+              </strong>
             )}{' '}
             to your case.
           </p>
         </div>
       )}
 
-      {/* ── Evidence cards ── */}
+      {/* ── 3. Evidence cards ─────────────────────────────────────────────── */}
       {evidenceSummaries.length > 0 && (
         <div className="mt-8">
-          <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.18em] text-slate-faint">
-            What we found in your case · each point is a real rule
+          <p className="font-mono text-[10px] tracking-widest text-ink/40 uppercase mb-4">
+            Regulations &amp; precedents matched to your case
           </p>
           <div className="flex flex-col gap-3">
             {evidenceSummaries.map((ev, i) => (
-              <div key={i} className="rounded-2xl border border-rule bg-paper px-5 py-4 shadow-lift">
+              <div key={i} className="rounded-xl border border-rule bg-cream px-5 py-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
-                    <p className="font-sans text-sm font-medium leading-snug text-ink">
+                    <p className="font-sans text-sm font-medium text-ink leading-snug">
                       {ev.source_title}
                       {ev.section_number && (
-                        <span className="font-mono text-xs text-slate-muted"> §{ev.section_number}</span>
+                        <span className="font-mono text-xs text-ink/50"> §{ev.section_number}</span>
                       )}
                     </p>
-                    <p className="mt-1.5 font-sans text-sm leading-relaxed text-slate">{ev.explainer}</p>
+                    <p className="mt-1.5 font-sans text-sm text-ink/70 leading-relaxed">
+                      {ev.explainer}
+                    </p>
                   </div>
                   <span
                     className={`flex-shrink-0 rounded-md px-2 py-0.5 font-mono text-[10px] tracking-wide ${
-                      ev.tier === 1 ? 'bg-blue/10 text-blue-deep' : 'bg-sun/20 text-gold'
+                      ev.tier === 1
+                        ? 'bg-forest/10 text-forest'
+                        : 'bg-amber-100 text-amber-700'
                     }`}
                   >
-                    {ev.tier === 1 ? 'IRDAI rule' : 'Ombudsman'}
+                    {ev.tier === 1 ? 'IRDAI Reg' : 'Precedent'}
                   </span>
                 </div>
               </div>
@@ -315,119 +336,143 @@ function ResultView({ result, caseId }: { result: AnalyseResponse; caseId: strin
         </div>
       )}
 
-      {/* ── Visible teaser bullets ── */}
-      {visibleBullets.length > 0 && (
-        <div className="mt-8">
-          <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.18em] text-slate-faint">
-            Your strongest points
-          </p>
+      {/* ── 4a. Visible bullets (first 3 from deep analysis) ─────────────── */}
+      <div className="mt-8">
+        <p className="font-mono text-[10px] tracking-widest text-ink/40 uppercase mb-4">
+          What we found in your case
+        </p>
+        {deepLoading && visibleBullets.length === 0 ? (
+          // Loading skeleton while deep analysis runs
+          <div className="flex flex-col gap-3">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="rounded-xl border border-forest/20 bg-forest/5 px-5 py-4 animate-pulse"
+              >
+                <div className="h-4 rounded bg-forest/10 w-3/4" />
+              </div>
+            ))}
+          </div>
+        ) : visibleBullets.length > 0 ? (
           <div className="flex flex-col gap-3">
             {visibleBullets.map((line, i) => (
-              <div key={i} className="rounded-2xl border border-hope/20 bg-hope-soft/10 px-5 py-4">
+              <div key={i} className="rounded-xl border border-forest/20 bg-forest/5 px-5 py-4">
                 <div className="flex items-start gap-3">
-                  <span className="mt-0.5 font-mono text-[11px] font-semibold text-hope">{i + 1}.</span>
-                  <p className="flex-1 font-sans text-sm leading-relaxed text-ink">{line}</p>
+                  <span className="font-mono text-[11px] font-semibold text-forest leading-relaxed mt-0.5">
+                    {i + 1}.
+                  </span>
+                  <p className="flex-1 font-sans text-sm text-ink leading-relaxed">{line}</p>
                 </div>
               </div>
             ))}
           </div>
-        </div>
-      )}
+        ) : null}
+      </div>
 
-      {/* ── Blurred locked preview ── */}
-      <div className="relative mt-6 overflow-hidden rounded-3xl border border-rule">
+      {/* ── 4b. Blurred preview block ─────────────────────────────────────── */}
+      <div className="mt-6 relative overflow-hidden rounded-2xl border border-rule">
         <div
           className="pointer-events-none select-none px-6 py-6"
           style={{ filter: 'blur(8px)', userSelect: 'none' }}
           aria-hidden="true"
         >
-          <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-slate-faint">
-            The rest of your analysis
+          <p className="font-mono text-[10px] tracking-widest text-ink/40 uppercase mb-3">
+            Continued point-by-point analysis
           </p>
-          <div className="mb-5 flex flex-col gap-2">
+          <div className="flex flex-col gap-2 mb-5">
             {(blurredBullets.length > 0
               ? blurredBullets
               : [
-                  'Your insurer missed procedural deadlines set by the IRDAI Master Circular on Health Insurance.',
-                  'A written grievance to the Grievance Redressal Officer starts a 15-day response clock.',
-                  "Ombudsman rulings have overturned rejections of this kind in the policyholder's favour.",
+                  'Your insurer violated procedural deadlines under the IRDAI Master Circular on Health Insurance.',
+                  'A complaint to the Grievance Redressal Officer must be filed within 15 days under PPOI rules.',
+                  'Ombudsman precedents support reversal of rejections of this category in FY2024.',
                 ]
             ).map((line, i) => (
-              <div key={i} className="rounded-lg bg-sky-tint px-4 py-3">
+              <div key={i} className="rounded-lg bg-rule/60 px-4 py-3">
                 <p className="font-sans text-sm text-ink">
-                  <span className="mr-2 font-mono text-[11px] font-semibold">{visibleBullets.length + i + 1}.</span>
+                  <span className="font-mono text-[11px] font-semibold mr-2">
+                    {visibleBullets.length + i + 1}.
+                  </span>
                   {line}
                 </p>
               </div>
             ))}
           </div>
-          <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-slate-faint">
-            Your dispute letter (preview)
+          <p className="font-mono text-[10px] tracking-widest text-ink/40 uppercase mb-3">
+            Your custom dispute letter (preview)
           </p>
-          <div className="rounded-lg border border-rule bg-paper px-5 py-4">
-            <p className="font-sans text-sm leading-relaxed text-ink">
-              To, The Grievance Redressal Officer, [Insurer Name]. I am writing to formally dispute the
-              rejection of my health insurance claim dated [date] on the ground of [reason], which is not
-              in line with IRDAI regulations, as set out below…
+          <div className="rounded-lg border border-rule bg-white px-5 py-4">
+            <p className="font-sans text-sm text-ink leading-relaxed">
+              To, The Grievance Redressal Officer, [Insurer Name]. I write to formally dispute the
+              repudiation of my health insurance claim dated [date] on grounds of [reason], which is
+              not in accordance with IRDAI regulations as detailed below...
             </p>
           </div>
         </div>
 
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-mist/70 px-6 text-center backdrop-blur-[2px]">
-          <div className="mb-3 rounded-full border border-rule bg-paper p-3 shadow-lift">
-            <svg className="h-5 w-5 text-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-parchment/60 px-6 text-center">
+          <div className="rounded-full border border-rule bg-cream p-3 mb-3">
+            <svg
+              className="h-5 w-5 text-ink/40"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              />
             </svg>
           </div>
-          <p className="font-sans text-sm font-semibold text-ink-deep">The full plan is one step away</p>
-          <p className="mt-1 max-w-xs font-sans text-xs text-slate">
-            Unlock the complete breakdown, your deadlines, and a ready-to-send dispute letter.
+          <p className="font-sans text-sm font-semibold text-ink">Full analysis locked</p>
+          <p className="mt-1 font-sans text-xs text-ink/50 max-w-xs">
+            Unlock the complete regulation breakdown, applicable deadlines, and your custom dispute
+            letter.
           </p>
         </div>
       </div>
 
-      {/* ── CTA ── */}
+      {/* ── 5. CTA ───────────────────────────────────────────────────────── */}
       <div className="mt-8">
         <Link
           href={`/pay/${caseId}`}
-          className="flex w-full items-center justify-center gap-2 rounded-full bg-blue px-6 py-5 font-sans text-base font-semibold text-white shadow-lift transition-colors hover:bg-blue-deep"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-forest px-6 py-5 font-sans text-base font-semibold text-white shadow-md hover:bg-forest/90 transition-colors"
         >
-          Unlock my full analysis + dispute letter — ₹299
+          Unlock full analysis + formal dispute letter — ₹99
           <span aria-hidden>→</span>
         </Link>
 
-        {isDifficult ? (
-          <p className="mt-3 text-center font-sans text-xs leading-relaxed text-slate">
-            Even a tougher case gets a complete, formal letter setting out your rights and the exact
-            steps to escalate. Many people pay simply for the clarity of knowing where they stand.
-          </p>
-        ) : (
-          <p className="mt-3 text-center font-sans text-xs leading-relaxed text-slate">
-            One flat fee for this case. You pay only if you want the full letter and plan.
+        {band === 'low' && (
+          <p className="mt-3 text-center font-sans text-xs text-ink/50 leading-relaxed">
+            Cases graded &lsquo;Difficult&rsquo; still receive a complete formal GRO letter with
+            applicable procedural rights and escalation steps.
           </p>
         )}
       </div>
 
-      {/* ── Trust chips ── */}
+      {/* ── 6. Trust strip ───────────────────────────────────────────────── */}
       <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
         {[
           '94.5% ombudsman resolution rate',
           'IRDAI-cited sources only',
-          'One-time ₹299 · no subscription',
-          "Refund if it's not useful",
+          'No success fee',
+          'One-time ₹99 · No subscription',
         ].map((chip) => (
           <span
             key={chip}
-            className="rounded-full border border-rule bg-paper px-3 py-1 font-mono text-[10px] tracking-wide text-slate-muted"
+            className="rounded-full border border-rule bg-cream px-3 py-1 font-mono text-[10px] tracking-wide text-ink/50"
           >
             {chip}
           </span>
         ))}
       </div>
 
-      <p className="mt-8 text-center font-sans text-xs leading-relaxed text-slate-faint">
-        Everything here is based on verified IRDAI circulars and published ombudsman rulings. Ashray is
-        an informational tool, not legal advice.
+      <p className="mt-8 text-center font-sans text-xs text-ink/30 leading-relaxed">
+        All analysis is based on verified IRDAI circulars and ombudsman awards. This is not legal
+        advice.
       </p>
     </div>
   )

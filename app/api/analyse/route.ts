@@ -678,7 +678,6 @@ export async function GET(
       policyAgeMonthsFrom(supportingFacts, extractedFacts.rejection_date) ??
       extractedFacts.policy_age_months
     const derivedDiagnosis = primaryDiagnosisFrom(supportingFacts)
-    const supportingFactsText = renderSupportingFacts(supportingFacts)
 
     // 3. KB retrieval
     console.info('[analyse] stage: retrieval-start')

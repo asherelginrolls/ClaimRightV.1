@@ -35,6 +35,7 @@ ABSOLUTE RULES — VIOLATIONS WILL CORRUPT THE PRODUCT:
 4. Do NOT invent snippets. Every citation snippet must be a verbatim excerpt of at least 6 consecutive words from that chunk's text field.
 5. If the provided KB chunks do not support a specific category claim, you MUST STILL draft the paragraph — but frame it as a procedural argument grounded in the universal framework: the policyholder's right to a reasoned written rejection, the 15-day GRO response window, the right to escalate to Bima Bharosa (IGMS), and the right to approach the Insurance Ombudsman under the Insurance Ombudsman Rules 2017. Cite the most-relevant retrieved chunk for general framework if any was retrieved. Do NOT refuse to draft.
 6. The letter must be in formal Indian legal-correspondence English. Use phrases like "I respectfully submit", "in light of the above", "I reserve the right to escalate". Do NOT use "I feel", "kindly", or other softeners.
+6a. GENERAL PRINCIPLE angles: when the user message lists an angle under GENERAL PRINCIPLES, you may include it as a paragraph, but you MUST (a) open or close that paragraph with the phrase "As a general principle of Indian health-insurance regulation (to be confirmed with an advisor)", (b) attach NO [Source:] marker and an EMPTY citations array for that paragraph, and (c) never dress it up with an invented regulation name, section number, or date. An honestly-labeled principle is valuable; a fabricated citation is fatal.
 7. The body MUST contain between 3 and 5 numbered paragraphs. Each paragraph: one specific argument, one or more inline citations.
 8. Return ONLY valid JSON. No markdown fences. No text outside the JSON structure.
 
@@ -67,6 +68,11 @@ OUTPUT FORMAT (return exactly this JSON, no extra keys, no markdown):
   "relief_sought": "string describing exactly what outcome the policyholder wants (mirror the tri-clause)"
 }`
 
+export interface AnglesForPrompt {
+  verified: Array<{ title: string; argument: string; chunkIds: string[] }>
+  general: Array<{ title: string; argument: string }>
+}
+
 export const GENERATION_USER_PROMPT = (
   caseDetails: {
     insurer: string
@@ -76,7 +82,7 @@ export const GENERATION_USER_PROMPT = (
     rejectionDate: string | null
   },
   kbChunks: KbSearchResult[],
-  options: { lowConfidence?: boolean } = {}
+  options: { lowConfidence?: boolean; angles?: AnglesForPrompt } = {}
 ): string => {
   const chunksText = kbChunks.length
     ? kbChunks
@@ -96,7 +102,33 @@ text: ${c.content.slice(0, 1200)}
     ? `\n\n<retrieval_confidence>LOW — the knowledge base did not return a strong category-specific match for this rejection reason. Lean on the procedural framework (right to reasoned rejection, 15-day GRO response, Bima Bharosa / Ombudsman escalation rights). If any chunks are provided below, cite them only where their text genuinely supports the claim. Still produce a complete 3–5 paragraph formal letter — never refuse.</retrieval_confidence>`
     : ''
 
-  return `Draft a formal GRO complaint letter for this case.${confidenceNote}
+  let anglesBlock = ''
+  if (options.angles && (options.angles.verified.length > 0 || options.angles.general.length > 0)) {
+    const verifiedText = options.angles.verified.length
+      ? options.angles.verified
+          .map(
+            (a, i) =>
+              `V${i + 1}. ${a.title}\nArgument: ${a.argument}\nSupporting chunk id(s) to cite: ${a.chunkIds.join(', ') || '(none — cite the best-matching chunk below)'}`
+          )
+          .join('\n\n')
+      : '(none)'
+    const generalText = options.angles.general.length
+      ? options.angles.general.map((a, i) => `G${i + 1}. ${a.title}\nArgument: ${a.argument}`).join('\n\n')
+      : '(none)'
+    anglesBlock = `
+
+<legal_angles>
+These angles have already been strategized and adversarially checked. Build the letter's argument paragraphs from them — one paragraph per angle, strongest first. Do not invent additional legal angles.
+
+VERIFIED ANGLES (grounded in the knowledge base — assert strongly and cite the listed chunk ids):
+${verifiedText}
+
+GENERAL PRINCIPLES (not grounded in the knowledge base — include per rule 6a: labeled "As a general principle of Indian health-insurance regulation (to be confirmed with an advisor)", NO [Source:] marker, EMPTY citations array):
+${generalText}
+</legal_angles>`
+  }
+
+  return `Draft a formal GRO complaint letter for this case.${confidenceNote}${anglesBlock}
 
 <case_details>
 - Insurer: ${caseDetails.insurer}

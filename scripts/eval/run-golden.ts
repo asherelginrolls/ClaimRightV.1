@@ -179,44 +179,36 @@ async function runBaselineCase(c: GoldenCase): Promise<CaseResult> {
 
 // ── Pipeline mode: full REASON→GROUND→VALIDATE (Phase 3) ─────────────────────
 
-interface ReasoningModule {
-  runReasoningPipelineForEval(input: {
-    facts: GoldenCase['facts']
-    extraContext: string
-    primaryDiagnosis: string | null
-  }): Promise<{ letterText: string; retrievedSourceTitles: string[] }>
-}
+async function runPipelineCase(c: GoldenCase, mockKb: boolean): Promise<CaseResult> {
+  const { runReasoningPipelineForEval } = await import('../../lib/reasoning')
 
-async function runPipelineCase(c: GoldenCase): Promise<CaseResult> {
-  // Lazy import (variable specifier so tsc doesn't resolve it) — baseline mode
-  // must work before lib/reasoning.ts exists and without Supabase connectivity.
-  let reasoning: ReasoningModule
-  try {
-    const modPath = '../../lib/reasoning'
-    reasoning = (await import(modPath)) as ReasoningModule
-  } catch {
-    console.error(
-      '\n✗ Pipeline mode requires lib/reasoning.ts (built in Phase 3) and a reachable Supabase KB.\n' +
-        '  Run with --baseline to record the raw-Sonnet baseline instead.'
-    )
-    process.exit(2)
+  let retriever
+  if (mockKb) {
+    const { makeMockRetriever } = await import('./mock-retriever')
+    retriever = makeMockRetriever(process.cwd())
   }
 
-  const out = await reasoning.runReasoningPipelineForEval({
-    facts: {
-      insurer: c.facts.insurer,
-      claim_amount: c.facts.claim_amount,
-      rejection_date: c.facts.rejection_date,
-      rejection_reason_raw: c.facts.rejection_reason_raw,
-      rejection_reason_category: c.facts.rejection_reason_category,
-      documents_requested_count: c.facts.documents_requested_count,
-      policy_age_months: c.facts.policy_age_months,
-      policy_type: c.facts.policy_type,
-      rejection_reason_confidence: c.facts.rejection_reason_confidence,
+  const out = await runReasoningPipelineForEval(
+    {
+      facts: {
+        insurer: c.facts.insurer,
+        claim_amount: c.facts.claim_amount,
+        rejection_date: c.facts.rejection_date,
+        rejection_reason_raw: c.facts.rejection_reason_raw,
+        rejection_reason_category: c.facts.rejection_reason_category,
+        documents_requested_count: c.facts.documents_requested_count,
+        policy_age_months: c.facts.policy_age_months,
+        policy_type: c.facts.policy_type,
+        rejection_reason_confidence: c.facts.rejection_reason_confidence,
+      },
+      extraContext: c.extra_context.narrative,
+      primaryDiagnosis: c.extra_context.primary_diagnosis ?? null,
     },
-    extraContext: c.extra_context.narrative,
-    primaryDiagnosis: c.extra_context.primary_diagnosis ?? null,
-  })
+    retriever ? { retriever } : {}
+  )
+  if (out.usedFallback) {
+    console.log('  ⚠ strategize fell back to single-query retrieval for this case')
+  }
 
   const text = out.letterText
   const base = evaluateText(text, c)
@@ -229,9 +221,14 @@ async function runPipelineCase(c: GoldenCase): Promise<CaseResult> {
   const fabricated = sourceMarkers.filter(
     (s) => !retrievedTitles.some((t) => t.toLowerCase().includes(s.toLowerCase().slice(0, 24)) || s.toLowerCase().includes(t.toLowerCase().slice(0, 24)))
   )
+  // Each expected_citations entry may contain "|"-separated alternatives;
+  // the entry passes if ANY alternative appears.
   const expectedPresent = c.expected_citations.every((exp) =>
-    sourceMarkers.some((s) => s.toLowerCase().includes(exp.toLowerCase())) ||
-    text.toLowerCase().includes(exp.toLowerCase())
+    exp.split('|').some(
+      (alt) =>
+        sourceMarkers.some((s) => s.toLowerCase().includes(alt.toLowerCase())) ||
+        text.toLowerCase().includes(alt.toLowerCase())
+    )
   )
   const citationsOk = fabricated.length === 0 && expectedPresent
   if (fabricated.length > 0) console.log(`  ✗ citations not in retrieved set: ${fabricated.join(' | ')}`)
@@ -302,15 +299,35 @@ function writeBaselineDoc(cases: GoldenCase[], results: CaseResult[]): void {
 
 async function main() {
   const baselineMode = process.argv.includes('--baseline')
+  const mockKb = process.argv.includes('--mock-kb')
   const raw = fs.readFileSync(path.join(__dirname, 'golden-cases.json'), 'utf8')
   const cases = (JSON.parse(raw) as { cases: GoldenCase[] }).cases
 
-  console.log(`Golden eval — ${cases.length} case(s), mode: ${baselineMode ? 'BASELINE (raw Sonnet, no KB)' : 'PIPELINE'}`)
+  const modeLabel = baselineMode
+    ? 'BASELINE (raw Sonnet, no KB)'
+    : mockKb
+      ? 'PIPELINE (mock lexical KB — pseudo-similarities; pipeline mechanics only)'
+      : 'PIPELINE (live Supabase KB)'
+  console.log(`Golden eval — ${cases.length} case(s), mode: ${modeLabel}`)
 
   const results: CaseResult[] = []
   for (const c of cases) {
     console.log(`\nRunning ${c.id}...`)
-    const r = baselineMode ? await runBaselineCase(c) : await runPipelineCase(c)
+    let r: CaseResult
+    try {
+      r = baselineMode ? await runBaselineCase(c) : await runPipelineCase(c, mockKb)
+    } catch (err) {
+      console.error(`  ✗ case errored: ${err instanceof Error ? err.message : String(err)}`)
+      r = {
+        caseId: c.id,
+        anglesFound: c.expected_angles.map((a) => ({ id: a.id, found: false })),
+        mustNotViolations: [],
+        judgeVerdict: 'ERROR',
+        citationsOk: baselineMode ? null : false,
+        passed: false,
+        letterText: `(run error: ${err instanceof Error ? err.message : String(err)})`,
+      }
+    }
     printResult(c, r)
     results.push(r)
   }

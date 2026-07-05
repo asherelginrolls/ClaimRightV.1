@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { sonnet } from '@/lib/claude'
-import { retrieveChunks, retrieveForCase } from '@/lib/retrieval'
+import { retrieveChunks } from '@/lib/retrieval'
 import {
   GENERATION_SYSTEM_PROMPT,
   GENERATION_USER_PROMPT,
@@ -111,9 +111,11 @@ function tokenize(text: string): Set<string> {
   return new Set(
     text
       .toLowerCase()
-      .replace(/[^a-z0-9ऀ-ॿ\s]/g, '')
+      // Keep § and digits — section numbers and figures (30, 60, §5.7) are
+      // exactly the tokens legal span validation must not throw away.
+      .replace(/[^a-z0-9§ऀ-ॿ\s]/g, '')
       .split(/\s+/)
-      .filter((t) => t.length > 2 && !STOPWORDS.has(t))
+      .filter((t) => (t.length > 2 || /^\d+$/.test(t) || t.startsWith('§')) && !STOPWORDS.has(t))
   )
 }
 
@@ -124,6 +126,41 @@ function tokenOverlapCoefficient(snippet: string, chunkText: string): number {
   // Use Array.from to avoid downlevelIteration requirement
   const intersection = Array.from(snippetTokens).filter((t) => chunkTokens.has(t)).length
   return intersection / Math.min(snippetTokens.size, chunkTokens.size)
+}
+
+// ── Span score: verbatim-containment PRIMARY, token overlap secondary ───────
+//
+// The generation prompt requires citation.snippet to be a verbatim quote from
+// the chunk. A true verbatim quote passes containment at 1.0 regardless of
+// stopword quirks; near-verbatim text is caught by 6-gram overlap; only
+// paraphrases fall back to the (weaker) token-overlap coefficient. Thresholds
+// are unchanged (≥0.70 pass / 0.40–0.69 flag / <0.40 fail).
+
+function normalizeForSpan(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9§%ऀ-ॿ\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function sixGramOverlap(snippet: string, chunkText: string): number {
+  const words = normalizeForSpan(snippet).split(' ').filter(Boolean)
+  if (words.length < 6) return 0
+  const chunkNorm = normalizeForSpan(chunkText)
+  let hits = 0
+  let total = 0
+  for (let i = 0; i + 6 <= words.length; i++) {
+    total++
+    if (chunkNorm.includes(words.slice(i, i + 6).join(' '))) hits++
+  }
+  return total > 0 ? hits / total : 0
+}
+
+export function spanScore(snippet: string, chunkText: string): number {
+  const sNorm = normalizeForSpan(snippet)
+  if (sNorm.length >= 20 && normalizeForSpan(chunkText).includes(sNorm)) return 1
+  return Math.max(sixGramOverlap(snippet, chunkText), tokenOverlapCoefficient(snippet, chunkText))
 }
 
 function escapeRegex(str: string): string {
@@ -287,7 +324,7 @@ function validateParagraph(
       continue
     }
 
-    const overlap = tokenOverlapCoefficient(citation.snippet, chunk.content)
+    const overlap = spanScore(citation.snippet, chunk.content)
 
     if (overlap >= SPAN_PASS_THRESHOLD) {
       validatedCitations.push({ ...citation, overlap, status: 'pass' })
@@ -375,6 +412,115 @@ export function assembleValidatedLetter(
   }
 }
 
+// ── Angle-aware letter generation (CLAUDE.md §7 — the pipeline's step 5) ────
+//
+// Consumes a ReasoningResult from lib/reasoning.ts: verified angles carry real
+// KB chunks to cite; general-principle angles are included honestly labeled,
+// with NO citation. The fixed letter template and all post-payment guarantees
+// are unchanged.
+
+export async function generateLetterFromAngles(
+  caseFacts: CaseFacts,
+  reasoning: import('@/lib/reasoning').ReasoningResult
+): Promise<GenerationResult> {
+  // Chunks available for citation = merged retrieval + every angle's chunks.
+  const chunkMap = new Map<string, KbSearchResult>()
+  for (const c of reasoning.merged.chunks) chunkMap.set(c.id, c)
+  for (const a of reasoning.angles) for (const c of a.chunks) chunkMap.set(c.id, c)
+  const chunks = Array.from(chunkMap.values()).sort((a, b) => b.similarity - a.similarity)
+
+  const hasVerifiedAngle = reasoning.angles.some((a) => a.classification === 'verified')
+  const lowConfidence = !hasVerifiedAngle && reasoning.merged.topScore < GATING_FLOOR
+
+  const anglesForPrompt = {
+    verified: reasoning.angles
+      .filter((a) => a.classification === 'verified')
+      .map((a) => ({
+        title: a.title,
+        argument: a.argument,
+        chunkIds: a.chunks.map((c) => c.id),
+      })),
+    general: reasoning.angles
+      .filter((a) => a.classification === 'general_principle')
+      .map((a) => ({ title: a.title, argument: a.argument })),
+  }
+
+  // Full letter draft: Sonnet needs more than the 30s Haiku default. This
+  // runs post-payment (or in the stage engine) where latency budget is loose.
+  // If the draft hits max_tokens (truncated JSON), retry once with a
+  // conciseness instruction — a paid user must always get a letter.
+  const userContent = GENERATION_USER_PROMPT(
+    {
+      insurer: caseFacts.insurer,
+      claimAmount: caseFacts.claimAmount,
+      rejectionReasonRaw: caseFacts.rejectionReasonRaw,
+      rejectionReasonCategory: caseFacts.rejectionReasonCategory,
+      rejectionDate: caseFacts.rejectionDate,
+    },
+    chunks,
+    { lowConfidence, angles: anglesForPrompt }
+  )
+
+  let letterOutput: LetterOutput | null = null
+  for (let attempt = 0; attempt < 2 && !letterOutput; attempt++) {
+    const generationResponse = await sonnet.messages.create(
+      {
+        model: 'claude-sonnet-4-6',
+        max_tokens: 4096,
+        temperature: 0,
+        system:
+          attempt === 0
+            ? GENERATION_SYSTEM_PROMPT
+            : GENERATION_SYSTEM_PROMPT +
+              '\n\nIMPORTANT: your previous draft was truncated. Keep every body paragraph under 110 words and every snippet under 20 words so the complete JSON fits.',
+        messages: [{ role: 'user', content: userContent }],
+      },
+      { timeout: 120_000 }
+    )
+
+    const truncated = generationResponse.stop_reason === 'max_tokens'
+    const rawText =
+      generationResponse.content[0]?.type === 'text' ? generationResponse.content[0].text : '{}'
+    const cleanJson = rawText.replace(/```json\n?/g, '').replace(/```/g, '').trim()
+
+    try {
+      letterOutput = LetterOutputSchema.parse(JSON.parse(cleanJson))
+    } catch (parseError) {
+      console.error(
+        `[generate] LetterOutputSchema parse failed (attempt ${attempt + 1}${truncated ? ', truncated at max_tokens' : ''}):`,
+        parseError instanceof Error ? parseError.message : String(parseError)
+      )
+      if (attempt === 1) throw new Error('LLM returned invalid letter structure')
+    }
+  }
+  if (!letterOutput) throw new Error('LLM returned invalid letter structure')
+
+  return assembleValidatedLetter(caseFacts, chunks, letterOutput, { lowConfidence })
+}
+
+// Flatten a GenerationResult into the plain-text letter (used by the eval
+// harness and anywhere a single text body is needed).
+export function flattenLetter(result: GenerationResult): string {
+  return [
+    result.headerBlock,
+    '',
+    `Subject: ${result.subjectLine}`,
+    '',
+    result.salutation,
+    '',
+    ...result.paragraphs.map((p, i) => `${i + 1}. ${p.validatedText}`),
+    '',
+    result.triClauseBlock,
+    '',
+    result.escalationBlock,
+    '',
+    result.closing,
+    result.kbMissNote ? `\n${result.kbMissNote}` : '',
+  ]
+    .join('\n')
+    .trim()
+}
+
 // ── Main orchestrator ───────────────────────────────────────────────────────
 
 export async function generateDisputeLetter(caseId: string): Promise<GenerationResult> {
@@ -393,21 +539,32 @@ export async function generateDisputeLetter(caseId: string): Promise<GenerationR
   if (!caseRow.rejection_reason_raw)
     throw new Error('No rejection reason on case — cannot generate letter')
 
-  // STEP 1: RETRIEVAL
-  let retrievalResult = await retrieveForCase({
-    insurerName: caseRow.insurer,
+  const categoryRaw = caseRow.rejection_reason_category ?? 'other'
+  const category =
+    categoryRaw in CATEGORY_BASELINES ? (categoryRaw as CanonicalCategory) : 'other'
+  const caseFacts: CaseFacts = {
+    insurer: caseRow.insurer ?? 'the insurer',
+    claimAmount: caseRow.claim_amount ?? 0,
     rejectionReasonRaw: caseRow.rejection_reason_raw,
-    rejectionReasonCategory: caseRow.rejection_reason_category,
-    claimAmount: caseRow.claim_amount,
+    rejectionReasonCategory: category,
+    rejectionDate: caseRow.rejection_date,
+  }
+
+  // STEPS 1–4: REASON → GROUND → CLASSIFY (lib/reasoning.ts). Falls back
+  // internally to single-query retrieval if strategize fails.
+  const { runReasoning } = await import('@/lib/reasoning')
+  const reasoning = await runReasoning({
+    insurer: caseRow.insurer,
+    claimAmountRupees: caseRow.claim_amount != null ? Math.round(caseRow.claim_amount / 100) : null,
+    rejectionDate: caseRow.rejection_date,
+    rejectionReasonRaw: caseRow.rejection_reason_raw,
+    category: categoryRaw,
   })
 
-  // STEP 2: POST-PAYMENT KB-MISS HANDLING (CLAUDE_PART2.md §1)
-  // Pre-payment uses the 0.65 floor in the analyse pipeline; this function
-  // only runs after payment so we MUST always produce a real letter. If the
-  // top score is weak, do a second-pass retrieval at a relaxed threshold so
-  // Sonnet has *some* anchor chunks to ground citations against.
-  const lowConfidence = retrievalResult.topScore < GATING_FLOOR
-  if (lowConfidence) {
+  // POST-PAYMENT KB-MISS HANDLING: this function only runs after payment so we
+  // MUST always produce a real letter. If grounding came back empty/weak, do a
+  // relaxed second-pass retrieval so Sonnet has *some* anchor chunks.
+  if (reasoning.merged.topScore < GATING_FLOOR) {
     const fallbackQuery = [
       caseRow.rejection_reason_raw ?? '',
       caseRow.rejection_reason_category ?? '',
@@ -416,66 +573,23 @@ export async function generateDisputeLetter(caseId: string): Promise<GenerationR
       .filter(Boolean)
       .join(' ')
     if (fallbackQuery) {
-      const fallback = await retrieveChunks(fallbackQuery, {
-        matchThreshold: POST_PAYMENT_FALLBACK_THRESHOLD,
-        matchCount: 6,
-      })
-      if (fallback.chunks.length > retrievalResult.chunks.length) {
-        retrievalResult = fallback
+      try {
+        const fallback = await retrieveChunks(fallbackQuery, {
+          matchThreshold: POST_PAYMENT_FALLBACK_THRESHOLD,
+          matchCount: 6,
+        })
+        if (fallback.chunks.length > reasoning.merged.chunks.length) {
+          reasoning.merged = fallback
+        }
+      } catch (err) {
+        console.warn(
+          '[generate] fallback retrieval failed:',
+          err instanceof Error ? err.message : String(err)
+        )
       }
     }
   }
 
-  // STEP 3: GENERATION (RAG) — never skipped, even on KB miss
-  const generationResponse = await sonnet.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 3000,
-    system: GENERATION_SYSTEM_PROMPT,
-    messages: [
-      {
-        role: 'user',
-        content: GENERATION_USER_PROMPT(
-          {
-            insurer: caseRow.insurer ?? 'the insurer',
-            claimAmount: caseRow.claim_amount ?? 0,
-            rejectionReasonRaw: caseRow.rejection_reason_raw,
-            rejectionReasonCategory: caseRow.rejection_reason_category ?? 'other',
-            rejectionDate: caseRow.rejection_date,
-          },
-          retrievalResult.chunks,
-          { lowConfidence }
-        ),
-      },
-    ],
-  })
-
-  const rawText =
-    generationResponse.content[0]?.type === 'text' ? generationResponse.content[0].text : '{}'
-  const cleanJson = rawText.replace(/```json\n?/g, '').replace(/```/g, '').trim()
-
-  let letterOutput: LetterOutput
-  try {
-    letterOutput = LetterOutputSchema.parse(JSON.parse(cleanJson))
-  } catch (parseError) {
-    console.error('[generate] LetterOutputSchema parse failed:', parseError)
-    throw new Error('LLM returned invalid letter structure')
-  }
-
-  // STEPS 4 + 5 + 6: delegate to pure assembler
-  const categoryRaw = caseRow.rejection_reason_category ?? 'other'
-  const category =
-    categoryRaw in CATEGORY_BASELINES ? (categoryRaw as CanonicalCategory) : 'other'
-
-  return assembleValidatedLetter(
-    {
-      insurer: caseRow.insurer ?? 'the insurer',
-      claimAmount: caseRow.claim_amount ?? 0,
-      rejectionReasonRaw: caseRow.rejection_reason_raw,
-      rejectionReasonCategory: category,
-      rejectionDate: caseRow.rejection_date,
-    },
-    retrievalResult.chunks,
-    letterOutput,
-    { lowConfidence }
-  )
+  // STEP 5: GENERATION + SPAN VALIDATION — never skipped, even on KB miss
+  return generateLetterFromAngles(caseFacts, reasoning)
 }

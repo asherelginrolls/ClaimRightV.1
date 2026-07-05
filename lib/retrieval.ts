@@ -31,12 +31,24 @@ export async function retrieveChunks(
     matchCount?: number
   } = {}
 ): Promise<RetrievalResult> {
+  const queryEmbedding = await embedText(query, 'query')
+  return retrieveWithEmbedding(queryEmbedding, query, options)
+}
+
+// RPC + rerank with a caller-provided embedding. Lets lib/reasoning.ts batch
+// several angle queries into ONE Voyage embed call, then run one RPC each.
+export async function retrieveWithEmbedding(
+  queryEmbedding: number[],
+  queryText: string,
+  options: {
+    matchThreshold?: number
+    matchCount?: number
+  } = {}
+): Promise<RetrievalResult> {
   // Default to RETRIEVAL_THRESHOLD (0.55) so [0.55, 0.65) chunks reach the
   // reranker — see CLAUDE_PART2.md §6. Pre-payment gating against GATING_FLOOR
   // (0.65) is enforced by the consumers in lib/scoring.ts, NOT here.
   const { matchThreshold = RETRIEVAL_THRESHOLD, matchCount = 10 } = options
-
-  const queryEmbedding = await embedText(query, 'query')
 
   const supabase = createServiceClient()
 
@@ -49,7 +61,7 @@ export async function retrieveChunks(
     ) => Promise<{ data: KbSearchResult[] | null; error: { message: string } | null }>
   )('match_kb_chunks', {
     query_embedding: queryEmbedding,
-    query_text: query,
+    query_text: queryText,
     match_threshold: matchThreshold,
     match_count: matchCount,
   })

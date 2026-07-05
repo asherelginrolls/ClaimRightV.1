@@ -74,7 +74,32 @@ commit + an update here. FEATURES.md is the definition of done.
   - Registry updated (3 pending_ingestion rows + 1 manual_download row). Ingestion
     command for the pause: `npx tsx --env-file=.env.local scripts/ingest-md.ts
     scripts/kb-source-docs/<file>.md scripts/kb-source-docs/<file>.json` for each.
-- [ ] **Phase 3 — REASON→GROUND→VALIDATE pipeline**
+- [~] **Phase 3 — REASON→GROUND→VALIDATE pipeline** (built & wired; eval gate IN PROGRESS)
+  - BUILT: lib/reasoning.ts (strategize+adversarial Sonnet call temp 0 w/ truncation
+    retry, batch-embed grounding via retrieveWithEmbedding, VERIFIED≥0.65 vs
+    GENERAL PRINCIPLE classify, runReasoningPipelineForEval for the eval harness);
+    prompts/playbooks.ts (9 category playbooks w/ traps); prompts/reasoning.ts;
+    generation.ts: spanScore (verbatim-containment primary + 6-gram + numeric/§
+    tokens kept), temp 0, generateLetterFromAngles + flattenLetter + truncation
+    retry, generateDisputeLetter now runs REASON→GROUND first; prompts/generation.ts
+    rule 6a (general-principle labeling, no fabricated citations) + <legal_angles>
+    block; /api/analyse fast path wired (reasoning replaces bare retrieval; verified
+    angles feed fightability_reasons; ≤3 LLM calls); scripts/eval/mock-retriever.ts
+    (offline lexical mock).
+  - 🔴 SUPABASE UN-BLOCKED: project was only PAUSED — auto-restored on traffic, all
+    data intact. Purge ran against live DB (3 synthetic chunks deleted, KB 56→78
+    after ingesting the 3 new Phase-2 chunk files). Registry marked ingested.
+  - EVAL STATE: live pipeline run #1: bursitis PASSED (both angles, no inversion,
+    citations real). Run #2 after strategize-truncation fix: 2/5 (strategize
+    max_tokens 1500 truncated → NOW fixed w/ 2800+retry; piecemeal regex updated for
+    the stronger want-of-documents ground; ped expected_citations now "|"-alternatives
+    — run-golden supports "|" splitting). **NEXT STEP: re-run
+    `npx tsx --env-file=.env.local scripts/eval/run-golden.ts` and iterate to 5/5;
+    then retrieval benchmark `scripts/eval/retrieval-benchmark.ts --write`; then a
+    fabricated-citation catch test; then commit Phase 3.**
+  - NOTE: Sonnet calls need explicit timeouts (60s strategize / 120s letter — 30s
+    default times out). Anthropic+Voyage+Supabase keys all verified working.
+    Voyage free tier = 3 RPM (space bulk ops ~21s).
 - [ ] **Phase 4 — Auth + vault + dispute engine**
 - [ ] **Phase 5 — Stage artifacts + Bima Bharosa co-pilot**
 - [ ] **⏸ MIGRATION PAUSE** (008–0xx SQL to Asher, Supabase email-OTP setup)

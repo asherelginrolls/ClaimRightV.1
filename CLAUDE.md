@@ -249,7 +249,9 @@ copy** (a success-fee tier comes later).
 
 ### Coding rules (non-negotiable)
 TypeScript only; no `any`; Zod at all external boundaries; every external API call has
-try/catch + timeout + fallback; every LLM call ≤30s timeout; never commit secrets;
+try/catch + timeout + fallback; every LLM call has an explicit timeout (30s for
+Haiku extraction calls; 60s strategize / 120s letter for Sonnet reasoning calls) and
+a graceful error path; never commit secrets;
 files under UUID paths; strip patient name/phone/Aadhaar/policy-number before any text
 goes to an LLM (reinsert client-side only in the final PDF); rate-limit all public API
 routes; `npx tsc --noEmit` = 0 errors before any session is done; ≤3 LLM calls on any

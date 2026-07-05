@@ -75,9 +75,11 @@
       "expected_angles": [
         {
           "id": "piecemeal-prohibition",
-          "description": "Three sequential document requests violate the IRDAI prohibition on piecemeal requests (all documents must be called for at once).",
+          "description": "Sequential document demands cannot ground a rejection: no claim may be rejected/closed for want of documents; insurer/TPA must collect documents from the hospital; piecemeal demands are impermissible.",
           "match_patterns": [
-            "(piecemeal|separate|sequential|multiple)[\\s\\S]{0,160}(document|request)[\\s\\S]{0,260}(prohibit|violat|contraven|impermissib)"
+            "(piecemeal|separate|sequential|successive|multiple)[\\s\\S]{0,160}(document|request)[\\s\\S]{0,300}(prohibit|violat|contraven|impermissib|contrary|dilatory)",
+            "no claim[\\s\\S]{0,80}(rejected|closed)[\\s\\S]{0,80}(want of documents|documents)",
+            "(collect|obtain|source)[\\s\\S]{0,100}documents[\\s\\S]{0,120}(hospital|from the Hospital)"
           ]
         },
         {
@@ -134,7 +136,7 @@
         }
       ],
       "expected_citations": [
-        "PPOI Master Circular"
+        "Protection of Policyholders|Health Insurance Business|PPOI"
       ],
       "must_not_say": [
         {

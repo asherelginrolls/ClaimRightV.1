@@ -1,0 +1,238 @@
+{
+  "description": "Golden eval set (CLAUDE.md §11). Every KB/prompt/pipeline change must re-run scripts/eval/run-golden.ts; no case may regress. Case 1 is the real June 2026 field-test regression (Star Health bursitis).",
+  "cases": [
+    {
+      "id": "bursitis-star-health",
+      "title": "Star Health / trochanteric bursitis / Excl.02 F waiting-period rejection (THE golden case)",
+      "facts": {
+        "insurer": "Star Health and Allied Insurance Co. Ltd.",
+        "claim_amount": 3088500,
+        "rejection_date": "2026-02-05",
+        "rejection_reason_raw": "Unable to admit claim. As per policy terms the treatment of trochanteric bursitis falls under Excl.02 F — specified disease/procedure waiting period of 24 months. Policy period 04-Feb-2025 to 03-Feb-2026. Admission 06-Nov-2025.",
+        "rejection_reason_category": "waiting_period",
+        "documents_requested_count": 3,
+        "policy_age_months": 9,
+        "policy_type": "individual",
+        "rejection_reason_confidence": 0.95
+      },
+      "extra_context": {
+        "primary_diagnosis": "trochanteric bursitis",
+        "exclusion_code_cited": "Excl.02 F (specified disease/procedure waiting period, 24 months)",
+        "decision_delay_days": 91,
+        "narrative": "Admitted 06-Nov-2025 for trochanteric bursitis treatment. Insurer took ~91 days to decide, issuing repeated separate document requests, then rejected citing the 24-month specified-disease waiting period under Excl.02 F."
+      },
+      "expected_angles": [
+        {
+          "id": "excl02-misapplied",
+          "description": "Trochanteric bursitis is an acute soft-tissue inflammation, almost certainly NOT on the Excl.02 specified-disease list — the exclusion was misapplied.",
+          "match_patterns": [
+            "(acute|not (a |one of the )?(specified|listed))[\\s\\S]{0,220}(bursitis|condition|disease)",
+            "(bursitis|condition)[\\s\\S]{0,220}(not|is not|does not appear)[\\s\\S]{0,120}(specified disease|listed|enumerated|Excl\\.?\\s?02)"
+          ]
+        },
+        {
+          "id": "delay-piecemeal",
+          "description": "~91-day decision delay plus repeated piecemeal document requests violate the IRDAI settlement-timeline and piecemeal-prohibition rules.",
+          "match_patterns": [
+            "(91|ninety[- ]one|three months|30 days)[\\s\\S]{0,260}(delay|settle|decision|timeline)",
+            "(piecemeal|separate|repeated|multiple)[\\s\\S]{0,160}(document|request)"
+          ]
+        }
+      ],
+      "expected_citations": [
+        "IRDAI Master Circular on Health Insurance"
+      ],
+      "must_not_say": [
+        {
+          "id": "inverted-9-vs-24",
+          "description": "Must NEVER argue the policy being ~9 months old / short of the 24-month waiting period as if that helps the claimant — it concedes the insurer's case.",
+          "patterns": [
+            "(only|merely|just)?\\s?(about |approximately |~)?(9|nine)\\s?months?[\\s\\S]{0,200}(short of|falling short|less than|below|not (yet )?complete[d]?|has not (elapsed|passed|been met))[\\s\\S]{0,120}(24|twenty[- ]four)",
+            "(24|twenty[- ]four)[- ]month[\\s\\S]{0,160}(has not|had not|not yet)[\\s\\S]{0,80}(elapsed|passed|completed)[\\s\\S]{0,200}(therefore|hence|accordingly)[\\s\\S]{0,200}(entitled|payable|must be settled|allow)"
+          ]
+        }
+      ],
+      "judge_question": "Does this letter anywhere argue that the policy being only about 9 months old, or the 24-month waiting period not yet having elapsed, SUPPORTS the claimant's case? (That inverts the logic: being inside the waiting period helps the INSURER.) Answer strictly YES or NO."
+    },
+    {
+      "id": "piecemeal-documentation",
+      "title": "Documentation-incomplete rejection after 3 sequential document requests",
+      "facts": {
+        "insurer": "Care Health Insurance Ltd.",
+        "claim_amount": 18500000,
+        "rejection_date": "2026-05-20",
+        "rejection_reason_raw": "Claim closed due to non-submission of complete documents. Reminder letters dated 10-Mar, 02-Apr and 28-Apr requested discharge summary, itemised bills and treating doctor certificate respectively.",
+        "rejection_reason_category": "documentation_incomplete",
+        "documents_requested_count": 3,
+        "policy_age_months": 30,
+        "policy_type": "family_floater",
+        "rejection_reason_confidence": 0.95
+      },
+      "extra_context": {
+        "primary_diagnosis": "cardiac surgery (CABG)",
+        "narrative": "Hospitalised for cardiac surgery; reimbursement claim. Insurer issued three separate document requests over ~50 days, each naming a different document, then closed the claim as documentation incomplete. All requested documents were submitted each time."
+      },
+      "expected_angles": [
+        {
+          "id": "piecemeal-prohibition",
+          "description": "Three sequential document requests violate the IRDAI prohibition on piecemeal requests (all documents must be called for at once).",
+          "match_patterns": [
+            "(piecemeal|separate|sequential|multiple)[\\s\\S]{0,160}(document|request)[\\s\\S]{0,260}(prohibit|violat|contraven|impermissib)"
+          ]
+        },
+        {
+          "id": "settlement-timeline",
+          "description": "Settlement must occur within 30 days of the last necessary document; 2%/month interest applies to delay.",
+          "match_patterns": [
+            "\\b(30|thirty)\\b[^.]{0,14}days?[\\s\\S]{0,220}(settle|settlement|decide|decision)",
+            "(settle|settlement)[\\s\\S]{0,220}\\b(30|thirty)\\b[^.]{0,14}days?",
+            "(2|two)\\s?(%|per\\s?cent)[\\s\\S]{0,90}(per month|monthly|per mensem)[\\s\\S]{0,140}(interest|delay)",
+            "interest[\\s\\S]{0,90}(2|two)\\s?(%|per\\s?cent)"
+          ]
+        }
+      ],
+      "expected_citations": [
+        "IRDAI Master Circular on Health Insurance"
+      ],
+      "must_not_say": [
+        {
+          "id": "concede-incomplete-docs",
+          "description": "Must not concede that the claim was legitimately closable for incomplete documentation.",
+          "patterns": [
+            "(rightly|correctly|justifiab|entitled to)[\\s\\S]{0,120}(clos|reject|repudiat)[\\s\\S]{0,120}(document|non-submission)"
+          ]
+        }
+      ],
+      "judge_question": "Does this letter anywhere concede that the insurer was justified in closing or rejecting the claim because documents were incomplete? Answer strictly YES or NO."
+    },
+    {
+      "id": "ped-after-moratorium",
+      "title": "Pre-existing condition rejection on a 67-month-old policy (moratorium passed)",
+      "facts": {
+        "insurer": "HDFC ERGO General Insurance Co. Ltd.",
+        "claim_amount": 34000000,
+        "rejection_date": "2026-04-12",
+        "rejection_reason_raw": "Claim repudiated: Type 2 diabetes mellitus is a pre-existing disease not disclosed at proposal stage.",
+        "rejection_reason_category": "pre_existing_condition",
+        "documents_requested_count": 1,
+        "policy_age_months": 67,
+        "policy_type": "individual",
+        "rejection_reason_confidence": 0.95
+      },
+      "extra_context": {
+        "primary_diagnosis": "Type 2 diabetes complications",
+        "narrative": "Policy continuously in force for 67 months. Insurer repudiated a hospitalisation claim alleging non-disclosed pre-existing diabetes. No fraud alleged or documented."
+      },
+      "expected_angles": [
+        {
+          "id": "sixty-month-moratorium",
+          "description": "After 60 continuous months the PPOI moratorium bars repudiation on PED/non-disclosure grounds absent established fraud.",
+          "match_patterns": [
+            "(60|sixty)[- ]month[\\s\\S]{0,240}(moratorium|bar|cannot|barred|not permissible)",
+            "moratorium[\\s\\S]{0,240}(pre-existing|PED|non-disclosure)"
+          ]
+        }
+      ],
+      "expected_citations": [
+        "PPOI Master Circular"
+      ],
+      "must_not_say": [
+        {
+          "id": "moratorium-not-reached",
+          "description": "Must not claim the moratorium has not been reached (67 > 60) or otherwise concede PED grounds.",
+          "patterns": [
+            "(has not|had not|not yet)[\\s\\S]{0,80}(reach|complet|elapse)[\\s\\S]{0,120}(60|sixty)[- ]month",
+            "insurer (is|was|remains) (entitled|justified|within its rights)[\\s\\S]{0,140}(repudiat|reject)[\\s\\S]{0,140}(pre-existing|PED)"
+          ]
+        }
+      ],
+      "judge_question": "Does this letter anywhere state or imply that the 60-month moratorium does NOT apply to this 67-month-old policy, or concede that the insurer may lawfully reject THIS claim on pre-existing-disease or non-disclosure grounds? (Quoting the rule that insurers cannot repudiate after 60 months is a PRO-claimant argument, not a concession.) Answer strictly YES or NO."
+    },
+    {
+      "id": "cashless-preauth-delay",
+      "title": "Cashless denial — pre-auth request unanswered for 6 hours, forced private-pay",
+      "facts": {
+        "insurer": "New India Assurance Co. Ltd.",
+        "claim_amount": 9200000,
+        "rejection_date": "2026-06-01",
+        "rejection_reason_raw": "Cashless facility denied; pre-authorization could not be approved in time. Member advised to claim reimbursement, later partially settled applying network rate caps.",
+        "rejection_reason_category": "cashless_denial",
+        "documents_requested_count": 1,
+        "policy_age_months": 22,
+        "policy_type": "individual",
+        "rejection_reason_confidence": 0.9
+      },
+      "extra_context": {
+        "primary_diagnosis": "emergency appendectomy",
+        "narrative": "Network hospital submitted cashless pre-auth at 11:00. No decision for over 6 hours; patient forced to pay privately. Reimbursement later cut using network rate caps."
+      },
+      "expected_angles": [
+        {
+          "id": "one-hour-rule",
+          "description": "IRDAI mandates a cashless pre-auth decision within 1 hour (3 hours for discharge authorization); a 6-hour silence is a material breach.",
+          "match_patterns": [
+            "\\b(1|one)\\b[^.]{0,14}hours?[\\s\\S]{0,260}(pre-auth|preauth|cashless|decision|request)",
+            "(pre-auth|preauth|cashless)[\\s\\S]{0,260}\\b(1|one)\\b[^.]{0,14}hours?",
+            "(3|three)\\b[^.]{0,14}hours?[\\s\\S]{0,160}(discharge)"
+          ]
+        }
+      ],
+      "expected_citations": [
+        "IRDAI Master Circular on Health Insurance"
+      ],
+      "must_not_say": [
+        {
+          "id": "concede-rate-caps",
+          "description": "Must not concede the insurer may apply network rate caps to a situation its own delay created.",
+          "patterns": [
+            "insurer (is|was|remains) (entitled|justified|correct|within its rights)[\\s\\S]{0,140}(rate cap|network rate)"
+          ]
+        }
+      ],
+      "judge_question": "Does this letter anywhere concede that the insurer was entitled to apply network rate caps or that the cashless denial was proper? Answer strictly YES or NO."
+    },
+    {
+      "id": "non-disclosure-early-policy",
+      "title": "Non-disclosure rejection at 18 months (moratorium NOT passed — adversarial trap)",
+      "facts": {
+        "insurer": "Star Health and Allied Insurance Co. Ltd.",
+        "claim_amount": 12000000,
+        "rejection_date": "2026-05-05",
+        "rejection_reason_raw": "Claim repudiated for material non-disclosure of hypertension at proposal stage. Policy in force 18 months.",
+        "rejection_reason_category": "non_disclosure",
+        "documents_requested_count": 1,
+        "policy_age_months": 18,
+        "policy_type": "individual",
+        "rejection_reason_confidence": 0.9
+      },
+      "extra_context": {
+        "primary_diagnosis": "stroke (cerebrovascular accident)",
+        "narrative": "Insurer alleges hypertension was not disclosed at proposal, 18 months into the policy. This is the adversarial trap case: the 60-month moratorium does NOT protect this claimant, and the letter must not pretend it does. Viable angles are procedural: PMC/CRC review requirement, burden of proving materiality and nexus between the non-disclosed condition and the claim, and settlement-timeline compliance."
+      },
+      "expected_angles": [
+        {
+          "id": "procedural-review",
+          "description": "Rejection requires PMC/CRC review; insurer bears the burden of establishing material non-disclosure and its nexus to the claimed illness.",
+          "match_patterns": [
+            "(PMC|CRC|Policy Management Committee|Claims Review Committee|claims review)",
+            "(burden|onus|establish|prove)[\\s\\S]{0,180}(material|nexus|non-disclosure)"
+          ]
+        }
+      ],
+      "expected_citations": [
+        "PPOI Master Circular"
+      ],
+      "must_not_say": [
+        {
+          "id": "false-moratorium-claim",
+          "description": "Must NEVER invoke the 60-month moratorium as protecting an 18-month-old policy — same inversion class as the bursitis error.",
+          "patterns": [
+            "moratorium[\\s\\S]{0,260}(protect|bars|barred|prevents|cannot (be )?(cite|reject|repudiat))",
+            "(60|sixty)[- ]month[\\s\\S]{0,200}(protect|applies|entitle)"
+          ]
+        }
+      ],
+      "judge_question": "Does this letter anywhere invoke the 60-month pre-existing-disease moratorium as if it protects this claimant, whose policy is only 18 months old? Answer strictly YES or NO."
+    }
+  ]
+}

@@ -301,7 +301,19 @@ async function main() {
   const baselineMode = process.argv.includes('--baseline')
   const mockKb = process.argv.includes('--mock-kb')
   const raw = fs.readFileSync(path.join(__dirname, 'golden-cases.json'), 'utf8')
-  const cases = (JSON.parse(raw) as { cases: GoldenCase[] }).cases
+  let cases = (JSON.parse(raw) as { cases: GoldenCase[] }).cases
+
+  // --case <id> reruns a single case (e.g. after fixing its expectations);
+  // the full suite remains the gate for KB/prompt/pipeline changes.
+  const caseFlagIdx = process.argv.indexOf('--case')
+  if (caseFlagIdx !== -1) {
+    const wanted = process.argv[caseFlagIdx + 1]
+    cases = cases.filter((c) => c.id === wanted)
+    if (cases.length === 0) {
+      console.error(`No golden case with id "${wanted}"`)
+      process.exit(1)
+    }
+  }
 
   const modeLabel = baselineMode
     ? 'BASELINE (raw Sonnet, no KB)'

@@ -19,21 +19,21 @@ verification in Phase 6.
 - [ ] F11. Session cookie binding: another browser cannot read a case's analyse/generate endpoints
 
 ## Reasoning pipeline (Phase 3)
-- [ ] R1. lib/reasoning.ts runs STRATEGIZE → ADVERSARIAL → GROUND → CLASSIFY → SPAN-VALIDATE (Sonnet 4.6 for reasoning, temp 0)
-- [ ] R2. Angles classified VERIFIED (≥0.65 grounded, [Source:] attached) vs GENERAL PRINCIPLE (honestly labeled, no fabricated citation)
-- [ ] R3. Span validation uses verbatim-containment primary + token overlap secondary, keeps numeric/§ tokens
-- [ ] R4. Golden bursitis case: produces the two correct angles (Excl.02 misapplied; 91-day delay violation); never the inverted 9-vs-24 argument
-- [ ] R5. Fabricated-citation test: a citation referencing a chunk_id not in the retrieved set is caught and removed
-- [ ] R6. Golden eval suite passes with no regression vs raw-Sonnet baseline
+- [x] R1. lib/reasoning.ts runs STRATEGIZE → ADVERSARIAL → GROUND → CLASSIFY → SPAN-VALIDATE (Sonnet 4.6 for reasoning, temp 0) — evidence: live pipeline eval run 2026-07-05, 5/5
+- [x] R2. Angles classified VERIFIED (≥0.65 grounded, [Source:] attached) vs GENERAL PRINCIPLE (honestly labeled, no fabricated citation) — evidence: eval citation checks ✓ on all 5 cases
+- [x] R3. Span validation uses verbatim-containment primary + token overlap secondary, keeps numeric/§ tokens — evidence: scripts/test-generation.ts 30/30
+- [x] R4. Golden bursitis case: produces the two correct angles (Excl.02 misapplied; 91-day delay violation); never the inverted 9-vs-24 argument — evidence: bursitis-star-health PASS (both angles ✓, judge PASS)
+- [x] R5. Fabricated-citation test: a citation referencing a chunk_id not in the retrieved set is caught and removed — evidence: 3 hallucination-isolation checks in test-generation.ts all ✓
+- [x] R6. Golden eval suite passes with no regression vs raw-Sonnet baseline — evidence: pipeline 5/5 = baseline 5/5, plus real citations baseline lacks
 - [ ] R7. Analysis fast path latency measured and within budget
 
 ## Knowledge base (Phases 1–2)
-- [ ] K1. Synthetic ombudsman precedents purged from live kb_chunks and quarantined from source files
-- [ ] K2. Excl.01–Excl.18 standardized exclusions ingested with full definitions, incl. Excl.02 list + "acute/unlisted conditions are NOT specified diseases" chunk
-- [ ] K3. Settlement timelines + bank-rate-plus-2% delay interest + no-rejection-for-want-of-documents chunks present and retrievable
-- [ ] K4. Every chunk has complete metadata + authority_type; validation gate excludes contradictory/incomplete chunks
-- [ ] K5. Real ombudsman awards ingested (verified, no date contradictions) OR precedent content ships with no case-number attribution
-- [ ] K6. Retrieval benchmark (recall@5 / MRR) committed with baseline in docs/retrieval-baseline.md
+- [x] K1. Synthetic ombudsman precedents purged from live kb_chunks and quarantined from source files — evidence: purge ran (3 chunks deleted), KB now 78 chunks, files in quarantine/
+- [x] K2. Excl.01–Excl.18 standardized exclusions ingested with full definitions, incl. Excl.02 list + "acute/unlisted conditions are NOT specified diseases" chunk — evidence: excl02 benchmark queries hit@1 @0.705/@0.724
+- [x] K3. Settlement timelines + bank-rate-plus-2% delay interest + no-rejection-for-want-of-documents chunks present and retrievable — evidence: benchmark hits on all timeline queries
+- [ ] K4. Every chunk has complete metadata + authority_type; validation gate excludes contradictory/incomplete chunks (authority_type column lands at migration pause)
+- [x] K5. Real ombudsman awards ingested (verified, no date contradictions) OR precedent content ships with no case-number attribution — evidence: regulations-only KB, zero case-number attributions (fallback path per plan)
+- [x] K6. Retrieval benchmark (recall@5 / MRR) committed with baseline in docs/retrieval-baseline.md — evidence: recall@5 100%, MRR 0.808, 12/12
 
 ## Auth + vault (Phase 4)
 - [ ] A1. Email OTP sign-in works (Supabase Auth); /auth page + inline OTP on pay page

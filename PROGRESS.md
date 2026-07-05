@@ -74,7 +74,18 @@ commit + an update here. FEATURES.md is the definition of done.
   - Registry updated (3 pending_ingestion rows + 1 manual_download row). Ingestion
     command for the pause: `npx tsx --env-file=.env.local scripts/ingest-md.ts
     scripts/kb-source-docs/<file>.md scripts/kb-source-docs/<file>.json` for each.
-- [~] **Phase 3 — REASON→GROUND→VALIDATE pipeline** (built & wired; eval gate IN PROGRESS)
+- [x] **Phase 3 — REASON→GROUND→VALIDATE pipeline** (COMPLETE 2026-07-05)
+  - Golden eval **5/5** on the live pipeline (bursitis: both angles, no inversion,
+    citations real; all judges PASS). One expectation fix: non-disclosure case's
+    expected_citations "PPOI Master Circular" → "|"-alternatives matching the
+    actual KB source titles (PMC/CRC chunks live in the Health-MC + PPOI docs;
+    no source is literally titled "PPOI Master Circular"). run-golden.ts gained
+    `--case <id>` for single-case re-runs.
+  - Retrieval benchmark: **recall@5 = 100% (12/12), MRR = 0.808** — committed to
+    docs/retrieval-baseline.md. Both Excl.02 gap queries now hit@1.
+  - Fabricated-citation catch: scripts/test-generation.ts **30/30** incl. 3
+    hallucination-isolation checks (removal, title-drift, marker-omitted).
+  - tsc clean. FEATURES.md: R1–R6, K1–K3, K5, K6 flipped with evidence.
   - BUILT: lib/reasoning.ts (strategize+adversarial Sonnet call temp 0 w/ truncation
     retry, batch-embed grounding via retrieveWithEmbedding, VERIFIED≥0.65 vs
     GENERAL PRINCIPLE classify, runReasoningPipelineForEval for the eval harness);

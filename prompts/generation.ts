@@ -16,7 +16,7 @@ export function LETTER_TRI_CLAUSE(amountRupees: number): string {
   return [
     'In light of the above, I request that you:',
     `(i)   Reconsider and settle the claim of ${formattedAmount} in full;`,
-    '(ii)  Pay interest at 2% per month on the delayed amount as mandated by the IRDAI Master Circular on Health Insurance dated 29.05.2024, if applicable;',
+    '(ii)  Pay penal interest at the bank rate plus 2% on the delayed amount, suo-moto, as mandated by the IRDAI Master Circular on Protection of Policyholders’ Interests dated 05.09.2024, if applicable;',
     '(iii) Provide a written reasoned response within 15 days as required under IRDAI grievance redressal norms.',
   ].join('\n')
 }
@@ -42,7 +42,7 @@ WHAT YOU WRITE vs. WHAT IS ADDED PROGRAMMATICALLY:
 You write ONLY: subject_line, salutation, body_paragraphs (3-5), closing, relief_sought.
 You do NOT write — and must NOT reproduce — the following, which are added verbatim around your output by the system:
   • The date / "To, The Grievance Redressal Officer / [Insurer Name]" header block.
-  • The "(i) Reconsider and settle… (ii) Pay interest at 2% per month… (iii) Provide a written reasoned response within 15 days…" tri-clause.
+  • The "(i) Reconsider and settle… (ii) Pay penal interest at the bank rate plus 2%… (iii) Provide a written reasoned response within 15 days…" tri-clause.
   • The "Should the response be unsatisfactory or not received within 15 days, I reserve the right to escalate this matter to the IRDAI Bima Bharosa portal and subsequently to the Insurance Ombudsman under the Insurance Ombudsman Rules 2017." escalation sentence.
 Do NOT duplicate these in your body_paragraphs, closing, or relief_sought. The closing should be a brief signing-off paragraph; the escalation sentence is appended separately.
 

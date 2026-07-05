@@ -35,6 +35,16 @@ const SYNONYM_MAP: Array<[RegExp, string]> = [
   // Claim denial synonyms
   [/\bclaim denial\b/gi, 'claim denial repudiation rejection refused settlement'],
   [/\bclaim rejection\b/gi, 'claim rejection repudiation denial refused settlement'],
+  // Standardized exclusion codes (Excl01–Excl18, with or without dot/space)
+  [/\bExcl\.?\s?0?2\b/gi, 'Excl02 specified disease procedure waiting period listed conditions standardized exclusion'],
+  [/\bExcl\.?\s?0?1\b/gi, 'Excl01 pre-existing disease PED waiting period standardized exclusion'],
+  [/\bExcl\.?\s?(0?[3-9]|1[0-8])\b/gi, 'standardized exclusion code IRDAI standardization of exclusions'],
+  [/\bspecified disease\b/gi, 'specified disease procedure listed conditions Excl02 waiting period'],
+  // Documentation / piecemeal
+  [/\bpiecemeal\b/gi, 'piecemeal one-go successive repeated document requests want of documents'],
+  [/\bincomplete documentation\b/gi, 'want of documents non-submission documents piecemeal rejected closed'],
+  // Delay interest
+  [/\bdelay(ed)? (interest|settlement)\b/gi, 'penal interest bank rate plus 2 percent suo-moto turnaround time TAT'],
 ]
 
 export function expandQueryWithSynonyms(query: string): string {

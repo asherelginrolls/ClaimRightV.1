@@ -69,15 +69,15 @@ export function calculateFightabilityScore(
 
   if (facts.documents_requested_count !== null && facts.documents_requested_count >= 2) {
     strongReasons.push({
-      reason: `Your insurer sent ${facts.documents_requested_count} separate document requests for the same claim — a practice explicitly prohibited by the IRDAI Master Circular on Health Insurance.`,
-      citation: 'IRDAI Master Circular on Health Insurance (29.05.2024)',
+      reason: `Your insurer sent ${facts.documents_requested_count} separate document requests for the same claim — IRDAI requires insurers and TPAs to collect claim documents from the hospital themselves, and no claim may be rejected or closed for want of documents.`,
+      citation: 'IRDAI Master Circular on Health Insurance (29.05.2024); PPOI Master Circular (05.09.2024)',
     })
   }
 
   if (category === 'documentation_incomplete') {
     strongReasons.push({
-      reason: 'Claims rejected for incomplete documentation are overwhelmingly overturned at the ombudsman stage. IRDAI rules prohibit piecemeal document requests.',
-      citation: 'IRDAI Master Circular on Health Insurance (29.05.2024)',
+      reason: 'Claims rejected for incomplete documentation are overwhelmingly overturned at the ombudsman stage. IRDAI rules state that no claim shall be rejected or closed for want of documents.',
+      citation: 'PPOI Master Circular (05.09.2024)',
     })
   }
 

@@ -42,7 +42,38 @@ commit + an update here. FEATURES.md is the definition of done.
   - scripts/eval/retrieval-benchmark.ts: recall@5 + MRR against fixed expected
     citations; writes docs/retrieval-baseline.md with --write. Cannot run until
     Supabase is back — includes the two Excl.02 queries that measure the known gap.
-- [ ] **Phase 2 — KB deepening**
+- [x] **Phase 2 — KB deepening** (source files ready; ingestion happens post-pause)
+  - **irdai-standardized-exclusions-2019.{md,json}**: 11 chunks, Excl01–Excl18 FULL
+    verbatim standard wordings extracted from the official circular PDF
+    (IRDAI/HLT/REG/CIR/117/09/2019 — note: 117, not 177) fetched from New India
+    Assurance's official mirror. Includes THE bursitis-case chunk (Excl02 is
+    list-based per clause (f); acute/unlisted conditions cannot be repudiated under
+    Excl02; accident carve-out; Chapter VI §4 bans open-ended exclusion wording) +
+    Chapter II prohibited-exclusions list.
+  - **irdai-mc-claims-timelines.{md,json}**: 7 verbatim chunks from the health MC —
+    1hr cashless, 3hr discharge (insurer bears delay cost), TPA-collects-documents
+    ("Policyholder shall not be required to submit the documents"), PMC/CRC approval
+    required, 60-month moratorium, ₹5000/day ombudsman penalty, renewal protections.
+  - **ppoi-claims-safeguards.{md,json}**: 4 verbatim chunks — "No claim shall be
+    rejected or closed for want of documents or for delayed intimation", TAT table +
+    delay interest, one-go/piecemeal principle, free-look.
+  - **🔴 FACT CORRECTION: delay interest is "bank rate plus 2 percent" (suo-moto),
+    NOT "2% per month".** The 2%/month figure existed ONLY in the quarantined
+    synthetic precedents and had leaked into the PRD, CLAUDE.md, the letter
+    tri-clause, and the documentation baseline paragraph. All fixed (prompts/
+    generation.ts, prompts/category-baselines.ts, lib/scoring.ts reasons, CLAUDE.md
+    §5, FEATURES.md, golden-cases.json). Also: no "30-day reimbursement settlement"
+    provision exists in the verified local circular texts — claims now rest on the
+    verbatim TAT table + "no rejection for want of documents".
+  - Synonyms extended: Excl-code expansions, piecemeal/want-of-documents, delay
+    interest terms.
+  - Real ombudsman awards: cioins.co.in has no public Decisions index; the FY24-25
+    annual report (real case summaries) is >10MB → manual download task for Asher.
+    Fallback per plan: regulations-only KB, NO case-number attributions anywhere.
+  - scripts/extract-pdf-text.ts added (generic Haiku PDF transcription utility).
+  - Registry updated (3 pending_ingestion rows + 1 manual_download row). Ingestion
+    command for the pause: `npx tsx --env-file=.env.local scripts/ingest-md.ts
+    scripts/kb-source-docs/<file>.md scripts/kb-source-docs/<file>.json` for each.
 - [ ] **Phase 3 — REASON→GROUND→VALIDATE pipeline**
 - [ ] **Phase 4 — Auth + vault + dispute engine**
 - [ ] **Phase 5 — Stage artifacts + Bima Bharosa co-pilot**

@@ -75,9 +75,18 @@ law, and it protects you."
 ## 5. KEY IRDAI REGULATIONS (verified — cite exactly)
 
 **Master Circular on Health Insurance (29.05.2024):** cashless pre-auth decision within
-**1 hour**; discharge authorization within **3 hours**; reimbursement settlement within
-**30 days**; **2%/month interest** on delays; **piecemeal document requests
-prohibited**.
+**1 hour**; discharge authorization within **3 hours** (delay costs borne by insurer's
+shareholders' fund); **insurer/TPA must collect claim documents from the hospital —
+"Policyholder shall not be required to submit the documents"**; no repudiation without
+PMC/CRC approval; ombudsman awards must be implemented within 30 days (₹5,000/day
+penalty).
+
+**⚠️ Corrected July 2026:** delay interest is **"bank rate plus 2 percent", suo-moto**
+(PPOI Master Circular TAT provisions) — NOT "2% per month". The 2%/month figure was a
+fabrication that leaked in via the synthetic precedents; never use it. Likewise "no
+claim shall be rejected or closed for want of documents or for delayed intimation"
+(PPOI MC) is the verbatim ground for documentation cases — stronger than the informal
+"piecemeal prohibited" summary.
 
 **PPOI Master Circular (05.09.2024):** 30-day free-look; **60-month moratorium** on
 pre-existing-disease non-disclosure (after 60 months PED cannot be cited); rejection
@@ -156,7 +165,9 @@ Date → addressee (GRO/IRDAI/Ombudsman per stage) → subject → 3–5 numbere
 paragraphs each ending in `[Source:]` → fixed "I request" tri-clause (settle in full /
 2%-per-month interest / written response within 15 days) → escalation sentence →
 sign-off → enclosures reflecting docs actually uploaded → disclaimer footer ("Based on
-verified IRDAI regulations and ombudsman precedents… This is not legal advice.").
+verified IRDAI regulations and ombudsman precedents… This is not legal advice."). The
+tri-clause interest wording is "penal interest at the bank rate plus 2%, suo-moto"
+(see §5 correction).
 
 **Do not simplify, bypass, or add a "skip validation" flag. Ever.**
 

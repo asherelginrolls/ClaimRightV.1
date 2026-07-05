@@ -82,7 +82,7 @@
         },
         {
           "id": "settlement-timeline",
-          "description": "Settlement must occur within 30 days of the last necessary document; 2%/month interest applies to delay.",
+          "description": "Settlement must occur within the mandated timelines; penal interest (bank rate plus 2%, suo-moto) applies to delay.",
           "match_patterns": [
             "\\b(30|thirty)\\b[^.]{0,14}days?[\\s\\S]{0,220}(settle|settlement|decide|decision)",
             "(settle|settlement)[\\s\\S]{0,220}\\b(30|thirty)\\b[^.]{0,14}days?",

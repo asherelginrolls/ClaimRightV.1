@@ -30,7 +30,7 @@ verification in Phase 6.
 ## Knowledge base (Phases 1–2)
 - [ ] K1. Synthetic ombudsman precedents purged from live kb_chunks and quarantined from source files
 - [ ] K2. Excl.01–Excl.18 standardized exclusions ingested with full definitions, incl. Excl.02 list + "acute/unlisted conditions are NOT specified diseases" chunk
-- [ ] K3. Settlement timelines + 2%/month interest + piecemeal prohibition chunks present and retrievable
+- [ ] K3. Settlement timelines + bank-rate-plus-2% delay interest + no-rejection-for-want-of-documents chunks present and retrievable
 - [ ] K4. Every chunk has complete metadata + authority_type; validation gate excludes contradictory/incomplete chunks
 - [ ] K5. Real ombudsman awards ingested (verified, no date contradictions) OR precedent content ships with no case-number attribution
 - [ ] K6. Retrieval benchmark (recall@5 / MRR) committed with baseline in docs/retrieval-baseline.md

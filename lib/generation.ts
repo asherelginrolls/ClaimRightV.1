@@ -16,11 +16,13 @@ import {
 import { createServiceClient, type Database } from '@/lib/supabase'
 import type { KbSearchResult } from '@/types/kb'
 
-// Post-payment KB-miss fallback threshold — see CLAUDE_PART2.md §6.
-// Pre-payment gating still uses 0.65; this 0.40 threshold is ONLY for the
-// post-payment path so we always have *something* to feed Sonnet rather than
-// returning a "consult an advisor" stub.
-const POST_PAYMENT_FALLBACK_THRESHOLD = 0.40
+import {
+  GATING_FLOOR,
+  SPAN_PASS_THRESHOLD,
+  SPAN_FLAG_THRESHOLD,
+  POST_PAYMENT_FALLBACK_THRESHOLD,
+} from '@/lib/thresholds'
+
 const POST_PAYMENT_MIN_WORDS = 400
 const POST_PAYMENT_MIN_CITATIONS = 3
 
@@ -287,9 +289,9 @@ function validateParagraph(
 
     const overlap = tokenOverlapCoefficient(citation.snippet, chunk.content)
 
-    if (overlap >= 0.70) {
+    if (overlap >= SPAN_PASS_THRESHOLD) {
       validatedCitations.push({ ...citation, overlap, status: 'pass' })
-    } else if (overlap >= 0.40) {
+    } else if (overlap >= SPAN_FLAG_THRESHOLD) {
       counters.flagged++
       validatedText = softenLanguage(validatedText)
       validatedCitations.push({ ...citation, overlap, status: 'flag' })
@@ -404,7 +406,7 @@ export async function generateDisputeLetter(caseId: string): Promise<GenerationR
   // only runs after payment so we MUST always produce a real letter. If the
   // top score is weak, do a second-pass retrieval at a relaxed threshold so
   // Sonnet has *some* anchor chunks to ground citations against.
-  const lowConfidence = retrievalResult.topScore < 0.65
+  const lowConfidence = retrievalResult.topScore < GATING_FLOOR
   if (lowConfidence) {
     const fallbackQuery = [
       caseRow.rejection_reason_raw ?? '',

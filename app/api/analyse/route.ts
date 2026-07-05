@@ -406,6 +406,15 @@ export async function GET(
     return NextResponse.json({ error: 'caseId is required.' }, { status: 400 })
   }
 
+  // Session cookie binding: verify this browser uploaded the case.
+  // Bypass in dev when SKIP_COOKIE_CHECK=true.
+  if (process.env.SKIP_COOKIE_CHECK !== 'true') {
+    const sessionCaseId = request.cookies.get('cr_sid')?.value
+    if (sessionCaseId !== caseId) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
+    }
+  }
+
   try {
     console.info('[analyse] stage: start caseId=' + caseId)
     const supabase = createServiceClient()

@@ -1,5 +1,6 @@
 import type { ExtractedFacts } from '@/types/api'
-import { GATING_FLOOR, type RetrievalResult } from '@/lib/retrieval'
+import type { RetrievalResult } from '@/lib/retrieval'
+import { GATING_FLOOR, STRONG_MATCH_THRESHOLD } from '@/lib/thresholds'
 import type { FightabilityScore, FightabilityReason } from '@/types/case'
 
 function clamp(value: number, min: number, max: number): number {
@@ -59,7 +60,7 @@ export function calculateFightabilityScore(
 
   const strongReasons: FightabilityReason[] = []
 
-  if (topScore >= 0.80 && chunks.length > 0) {
+  if (topScore >= STRONG_MATCH_THRESHOLD && chunks.length > 0) {
     strongReasons.push({
       reason: `A directly applicable IRDAI regulation was found that supports your dispute (match confidence: ${Math.round(topScore * 100)}%).`,
       citation: buildCitation(chunks[0]),
@@ -109,7 +110,7 @@ export function calculateFightabilityScore(
 
   const mediumReasons: FightabilityReason[] = []
 
-  if (topScore >= GATING_FLOOR && topScore < 0.80 && chunks.length > 0) {
+  if (topScore >= GATING_FLOOR && topScore < STRONG_MATCH_THRESHOLD && chunks.length > 0) {
     mediumReasons.push({
       reason: `A potentially applicable IRDAI regulation was found that may support your dispute (match confidence: ${Math.round(topScore * 100)}%).`,
       citation: buildCitation(chunks[0]),

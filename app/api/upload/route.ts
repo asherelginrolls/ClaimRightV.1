@@ -190,7 +190,14 @@ export async function POST(
     // the correctness path and fast enough on its own. The shared
     // ocrCaseDocuments() helper is ready in lib/ocr-docs.ts if a reliable
     // background mechanism is added later.
-    return NextResponse.json({ caseId, message: 'Documents uploaded. Redirecting to analysis...' })
+    const response = NextResponse.json({ caseId, message: 'Documents uploaded. Redirecting to analysis...' })
+    response.cookies.set('cr_sid', caseId, {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24, // 24 hours
+    })
+    return response
   } catch (error) {
     console.error('[upload] Error:', error)
     return NextResponse.json(

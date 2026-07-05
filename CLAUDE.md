@@ -1,581 +1,286 @@
-# ClaimRight — Technical Source of Truth
-**Last updated: May 2026 | Read this file completely before writing a single line of code.**
+# Ashray — Technical Source of Truth (V4)
+**Last updated: July 2026. Read this file completely before writing any code.**
+
+> Supersedes CLAUDE.md V1, CLAUDE_PART2.md (V2), and CLAUDE_V3.md — all archived in
+> `docs/archive/`. This file reflects the July 2026 one-shot build: the Ashray rebrand,
+> the REASON→GROUND→VALIDATE pipeline, accounts + case vault, and the multi-stage
+> dispute engine.
 
 ---
 
-## WHAT IS CLAIMRIGHT
+## 1. WHAT IS ASHRAY
 
-ClaimRight is an AI-powered health insurance dispute co-pilot for India. A user uploads their rejection letter. The system reads it, extracts structured facts, searches a curated knowledge base of IRDAI regulations and ombudsman awards, generates a Fightability Score with real citations, and produces a downloadable dispute letter PDF backed by verified sources.
+Ashray (आश्रय — "shelter/refuge", formerly ClaimRight) is an AI health-insurance
+dispute co-pilot for India. A user uploads their rejection letter. The system reads it,
+extracts structured facts, reasons about the strongest legal angles, grounds each angle
+in a curated knowledge base of IRDAI regulations and ombudsman awards, produces a
+Fightability Score with real citations, generates a source-backed Dispute Pack, and
+then walks the user through filing it — escalating stage by stage (GRO → Bima Bharosa →
+Ombudsman) until they win or exhaust the ladder.
 
-**This is not a services company. It is a productized AI platform.**
+**Core trust guarantee:** every legal claim in every letter traces to a real, verified
+source. If the KB doesn't have it, Ashray doesn't assert it as law — it labels it a
+general principle instead. No fabricated regulations, dates, section numbers, case IDs,
+or precedents. Ever. (DoNotPay: $193K FTC fine, 2025. Stanford HAI: legal AI
+hallucinates 1 in 6+ queries even with citations.)
 
-The core trust guarantee: every legal claim in every dispute letter traces to a real, verified source document. If the KB doesn't have it, ClaimRight doesn't claim it. No fabrication. Ever.
-
----
-
-## CRITICAL DIRECTIVE: HEALTH INSURANCE ONLY
-
-Per co-founder Dr. B. Gopinath's explicit direction: **DO NOT** build for, discuss, or plan motor insurance, consumer disputes, or any vertical expansion. Health insurance is a ₹26,000 Cr rejected claims market. It is large enough. Any scope creep into other verticals signals lack of conviction and will be cut immediately.
-
----
-
-## TEAM
-
-**Asher Elgin — Founder, GTM & Product**
-- Non-technical. Uses Claude Code via the Claude desktop app (Cowork), not a terminal.
-- Built PARIKSHE YouTube channel 1K → 100K subscribers organically in 6 months (political marketing)
-- Personal experience: mother's health insurance claim rejected by [insurer] after 90-day delay; she got it overturned
-- Marketing-focused, domain researcher, GTM executor
-- Based in the US on OPT (until September; STEM extension possible with company sponsorship)
-
-**Dr. B. Gopinath — Co-Founder, Technical Advisor**
-- 82 years old. PhD Stanford EE (1967). IEEE Life Fellow. 30+ US patents. 100+ publications.
-- 20+ years AT&T Bell Labs. Professor at UC Berkeley and Rutgers.
-- Created the Gopinath Observer algorithm (embedded in millions of devices globally).
-- Founded Lotus Interworks → exits including Cisco acquisition. Founded Simplia (conversational AI marketplace, 2009).
-- Started a similar insurance company in 2001 — got killed by insurer lobbying in 2002. Knows the adversarial landscape firsthand.
-- Currently based in Los Angeles, CA. Website: gopi.ai.
-- **Mathematician. Demands bottoms-up numbers, not top-down estimates. Never estimates — builds from the ground up.**
+### CRITICAL DIRECTIVE: HEALTH INSURANCE ONLY
+Per co-founder Dr. B. Gopinath: no motor, life, consumer, or any other vertical. Ever.
 
 ---
 
-## KEY MARKET DATA (VERIFIED)
+## 2. TEAM (context for tone & decisions)
 
-All figures sourced from official IRDAI and government data:
+**Asher Elgin — Founder, GTM & Product.** Non-technical; uses Claude Code via the
+Claude desktop app (Cowork), not a terminal. US-based on OPT. Personal motivation:
+mother's claim rejected after a 90-day delay, then overturned.
 
-- ₹26,037 Cr in rejected/disallowed health insurance claims in FY2023-24 (IRDAI Annual Report FY24, Lok Sabha data via Moneylife)
-- 19.10% YoY increase in rejections
-- 11% overall denial rate across all health claims
-- Less than 1% of rejected claimants formally dispute their rejection
-- When they do dispute formally, win rates are high — the ombudsman resolved 94.5% of complaints in FY2023-24 (52,575 cases)
-- Average health insurance claim value: ~₹35,000 (all claims); ~₹70,000–75,000 for disputed/hospitalization claims
-- Insurance Samadhan (main competitor): 104-person service company, ₹999 + 18% success fee, 5–7% acceptance rate, ~2,000–3,000 resolved cases/year, ₹6.21 Cr revenue FY2025, ₹137 Cr valuation, North India focus, handles Life+Health+General
-
-**NOTE: Do NOT use "87% win rate" language anywhere in the product or codebase. The 87% figure in older research referred to cases disposed of within 90 days (speed metric), not policyholder win rate. Use "94.5% ombudsman resolution rate" (the verified figure) instead.**
+**Dr. B. Gopinath — Co-Founder, Technical Advisor.** 82. PhD Stanford EE. IEEE Life
+Fellow. Bell Labs 20+ yrs. Ran a similar insurance company in 2001, killed by insurer
+lobbying. **Mathematician: demands bottoms-up numbers, never top-down estimates.**
 
 ---
 
-## DISPUTE ESCALATION PROCESS (India)
+## 3. KEY MARKET DATA (verified — cite exactly)
 
-Users go through these stages in order:
-
-1. **GRO (Insurer Grievance Redressal Officer)** — File within 15 days. Insurer must respond within 15 days.
-2. **IGMS / Bima Bharosa (IRDAI portal)** — File at bimabharosa.irdai.gov.in if GRO fails. Insurer response window: 15 days.
-3. **Insurance Ombudsman (CIO)** — FREE. No lawyers allowed. 94.5% resolution rate. Max claim: ₹50L. Window: 1 year from insurer's final rejection.
-4. **Consumer Court** — Last resort. Lawyer typically required. 6–18 months. 2-year limitation period.
-
-**CRITICAL LEGAL CONSTRAINT**: IGMS and Ombudsman filing must be done by the policyholder directly. ClaimRight's legal model is "Assisted Filing" — ClaimRight drafts all content, user submits themselves. We do NOT file on anyone's behalf via POA for IGMS/Ombudsman because IRDAI explicitly prohibits third-party IGMS filing and the CIO Rules 2017 prohibit legal representatives appearing before the ombudsman.
-
----
-
-## KEY IRDAI REGULATIONS (already verified, cite these exactly)
-
-**Master Circular on Health Insurance (29.05.2024):**
-- Cashless pre-authorization: insurer must decide within 1 hour
-- Discharge authorization: insurer must decide within 3 hours
-- Reimbursement settlement: insurer must pay within 30 days
-- Interest: 2% per month on delayed settlements
-- Piecemeal document requests are prohibited — insurer must request all documents at once
-
-**PPOI Master Circular (05.09.2024):**
-- 30-day free look period for new policies
-- 60-month moratorium on pre-existing disease non-disclosure — after 60 months, PED cannot be cited as grounds for rejection
-- Claim rejection requires PMC (Policy Management Committee) or CRC (Claims Review Committee) review
-
-**Insurance Ombudsman Rules 2017:**
-- ₹5,000/day penalty for non-compliance with ombudsman awards within 30 days
-- No legal representative allowed before ombudsman
+- ₹26,037 Cr rejected/disallowed health claims FY2023-24 (IRDAI Annual Report; Lok
+  Sabha data via Moneylife). 19.10% YoY increase. ~11% denial rate.
+- <1% of rejected claimants formally dispute.
+- Ombudsman resolved **94.5%** of complaints FY2023-24 (52,575 cases). **Use "94.5%
+  ombudsman resolution rate" — NEVER "87% win rate"** (87% was a speed metric).
+- Avg health claim ~₹35,000; disputed/hospitalization ~₹70,000–75,000.
+- Competitor **Insurance Samadhan**: 104-person service company, ₹999 + 18% success
+  fee, 5–7% acceptance rate, ~2,000–3,000 cases/yr, ₹6.21 Cr revenue FY2025.
 
 ---
 
-## THIS PROJECT IS STARTING FROM ZERO
+## 4. ESCALATION LADDER & LEGAL CONSTRAINT
 
-There is no existing codebase for ClaimRight. This folder (`claimright-code/`) is the beginning. Do not reference or import code from anywhere else in the parent folder. The only things that exist and are useful references:
-- `../landing.html` — A landing page with design elements, copywriting, and a rules-based fightability calculator. Reference it for design language, colors, and copy only. Do not copy its JavaScript or form handlers directly — they have bugs.
-- `../research/` — Research documents with verified facts, market data, and architecture decisions.
+1. **GRO** (insurer Grievance Redressal Officer) — file within 15 days; insurer
+   responds within 15 days.
+2. **IGMS / Bima Bharosa** (bimabharosa.irdai.gov.in) — if GRO fails; 15-day window.
+3. **Insurance Ombudsman (CIO)** — FREE, no lawyers, 94.5% resolution, max ₹50L, file
+   within 1 year of final rejection.
+4. **Consumer Court** — last resort; guidance/handoff only, never automated.
 
-**No API keys have been set up yet.** Every session prompt will specify exactly which API key to obtain before running that session. Do not assume any key exists.
-
----
-
-## MVP SCOPE — 5 SCREENS ONLY
-
-This is the MVP. The smallest thing that proves people will upload a rejection letter and pay ₹99 for a dispute letter. Nothing else.
-
-### SCREEN 1: Landing Page
-- Headline: "Got your health insurance claim rejected? Find out if you can fight it."
-- Single CTA: "Upload Your Rejection Letter"
-- Trust signals: "Based on IRDAI regulations" + stat from the ombudsman
-- No login, no signup, no friction
-
-### SCREEN 2: Upload
-- Upload rejection letter PDF or image (JPG/PNG)
-- Optional: upload policy document
-- Email field (to send them the dispute letter later)
-- Privacy notice: "Do not include Aadhaar number, phone number, or policy number. Text is analyzed and not stored."
-
-### SCREEN 3: Analysis Results
-- Fightability Score: Low / Medium / Strong (with color coding)
-- 2–3 bullet points citing real regulations
-- Example: "IRDAI Master Circular §5.7 prohibits piecemeal document requests. Your insurer sent 3 separate document demands."
-- Claim amount and insurer name extracted from their letter, displayed back to them
-- CTA: "Get Your Dispute Letter — ₹99"
-
-### SCREEN 4: Payment
-- Razorpay payment button (UPI + card + netbanking)
-- What they get: one paragraph description
-- ₹99 flat. No success fee for MVP.
-
-### SCREEN 5: Download / Delivery
-- Download dispute letter PDF
-- PDF also emailed to them
-- "What to do next" — 3 plain-English steps
-
-### EXPLICITLY OUT OF SCOPE FOR THIS MVP
-- No login or auth system (email field only)
-- No user dashboard or case tracker
-- No milestone tracker
-- No WhatsApp automation
-- No HITL admin panel
-- No multi-stage escalation packs
-- No questionnaire fallback (PDF/image upload only — no text paste input on the front end)
-- No ombudsman filing guide
-- No success fee tier (comes after MVP proves demand)
-- No insurer-specific templates
-- No analytics dashboard
-- No mobile app
-- No A/B testing
-- No blog or content section
+**LEGAL MODEL = "Assisted Filing."** Ashray drafts every field and walks the user
+through the portal; the policyholder submits themselves. IRDAI prohibits third-party
+IGMS filing; CIO Rules 2017 prohibit representatives before the ombudsman. Never build
+server-side automation that logs into or submits on government portals. Surface this as
+a trust feature: "we prepare everything; you stay in control and submit — that's the
+law, and it protects you."
 
 ---
 
-## ANTI-HALLUCINATION PIPELINE — NON-NEGOTIABLE ARCHITECTURE
+## 5. KEY IRDAI REGULATIONS (verified — cite exactly)
 
-**Why this matters:** DoNotPay was fined $193,000 by the FTC in 2025 for making AI legal claims it couldn't substantiate. Stanford HAI (2024) found legal AI hallucinates in 1 out of 6+ queries even when citations are present — because models post-hoc assign citations that don't actually support the claim. ClaimRight's span validation directly addresses this.
+**Master Circular on Health Insurance (29.05.2024):** cashless pre-auth decision within
+**1 hour**; discharge authorization within **3 hours**; reimbursement settlement within
+**30 days**; **2%/month interest** on delays; **piecemeal document requests
+prohibited**.
 
-Every sentence in a ClaimRight dispute letter must be grounded in the KB before being included. This pipeline is not optional and cannot be simplified away.
+**PPOI Master Circular (05.09.2024):** 30-day free-look; **60-month moratorium** on
+pre-existing-disease non-disclosure (after 60 months PED cannot be cited); rejection
+requires PMC/CRC review.
 
-### STEP 1 — RETRIEVAL
-- Query the KB using the rejection reason + insurer name + claim type
-- Retrieve top 10 most similar chunks using hybrid search (vector cosine similarity + Postgres full-text search, weighted 70/30)
-- Re-rank the top 10 → return top 3
-- **Minimum similarity threshold: 0.65.** If nothing scores above 0.65 on a topic, do NOT generate a legal claim about that topic.
+**Insurance Ombudsman Rules 2017:** ₹5,000/day penalty for non-compliance with awards
+within 30 days; no legal representative before the ombudsman.
 
-### STEP 2 — GENERATION (RAG)
-- LLM (Claude Sonnet 4.6) receives: [top 3 retrieved chunks] + [extracted case facts] + [system prompt]
-- System prompt instructs: "Use ONLY the provided source documents. Cite every factual claim inline. Never infer regulations not present in the provided documents. Do not hallucinate chunk IDs. Every citation.snippet must be a verbatim quote from the provided chunk text."
-- Output: draft dispute letter with inline citations like `[Source: IRDAI Master Circular 29.05.2024, §5.7]`
-
-### STEP 3 — SPAN VALIDATION
-- For each inline citation in the output:
-  - Find the cited source chunk in the retrieved set
-  - Compute token overlap coefficient between the claim text and the source chunk text (stopwords removed)
-  - Score: 0.0 to 1.0
-
-### STEP 4 — THRESHOLD FILTERING
-- Score ≥ 0.70 → **PASS** — include in letter as-is
-- Score 0.40–0.69 → **FLAG** — soften language ("may" / "appears to") + add disclaimer
-- Score < 0.40 → **FAIL** — remove sentence entirely, log as hallucination candidate
-
-### STEP 5 — KB MISS HANDLING
-- If no chunk retrieves above 0.65 for a topic, the system MUST:
-  - NOT generate any text on that topic
-  - Insert: "Note: We were unable to find a specific regulation for this point. We recommend consulting an insurance advisor for this aspect."
-  - Log this as a KB gap
-
-### OUTPUT
-- Every paragraph in the dispute letter ends with its source citation in brackets
-- PDF footer reads: "This letter is based on verified IRDAI regulations and ombudsman precedents. All citations are sourced from official IRDAI circulars. This is not legal advice."
+**Standardized exclusions Excl.01–Excl.18** — in the KB with full definitions;
+Excl.02 = specified disease/procedure waiting period, with its list plus an explicit
+"acute/unlisted conditions are NOT specified diseases under Excl.02" clarifier chunk.
 
 ---
 
-## KNOWLEDGE BASE STRUCTURE
+## 6. THE 9 CANONICAL REJECTION CATEGORIES & SCORING
 
-The KB is what makes ClaimRight defensible. It must be populated before the product goes live.
+| Code | Typical Fightability |
+|---|---|
+| `pre_existing_condition` | STRONG if policy >60 months (moratorium) |
+| `policy_exclusion` | Low–Medium |
+| `documentation_incomplete` | STRONG (piecemeal prohibited) |
+| `non_disclosure` | Low unless moratorium passed |
+| `waiting_period` | Strong if period passed |
+| `cashless_denial` | Strong (1hr/3hr rule) |
+| `experimental_treatment` | Medium (doctor cert often overturns) |
+| `fraud_suspected` | Low — different handling |
+| `other` | Varies |
 
-### Tier 1 — Regulatory Layer (highest authority)
-- IRDAI Master Circular on Health Insurance (29.05.2024) — download from irdai.gov.in
-- PPOI Master Circular (05.09.2024) — download from irdai.gov.in
-- Insurance Ombudsman Rules 2017 — download from cioins.co.in
-- Consumer Protection Act 2019 (relevant sections) — download from legislative.gov.in
-
-### Tier 2 — Precedent Layer
-- Published ombudsman awards — cioins.co.in/decisions
-- NCDRC orders — ncdrc.nic.in
-- Each award structured as: case_id, insurer, rejection_reason, decision_date, outcome, key_holding
-
-### NOT IN KB (explicitly excluded)
-- News articles
-- Insurance advisor blogs
-- Reddit / forum posts
-- Any source that cannot be traced to an official government or regulatory body
-
-### Chunking Rules
-- Chunk size: 400 tokens with 50-token overlap
-- Metadata required per chunk: tier (1/2/3), source_title, section_number, date, circular_number, issuer, url
-- **A chunk without complete metadata must NOT be ingested**
+Output: band `low|medium|strong` + numeric 0–100 (strong 65–95, medium 40–64, low
+5–39) + up to 3 reasons `{reason, citation|null}`. **STRONG if any:** KB match ≥0.80;
+2+ piecemeal doc requests; >30-day reimbursement delay or >1hr/3hr cashless; ombudsman
+precedent same reason + similar insurer; `documentation_incomplete`;
+`pre_existing_condition` + policy >60mo; `cashless_denial`. **MEDIUM if any:** KB match
+0.65–0.79; precedent different insurer same reason; `waiting_period` unclear; 7–30 days
+since rejection. **LOW otherwise.**
 
 ---
 
-## TECH STACK (ALL DECISIONS FINAL)
+## 7. THE REASONING + GROUNDING PIPELINE (the crown jewel — sacred)
 
-### Frontend + Hosting
-**Next.js 14 (App Router) + Tailwind CSS, deployed on Vercel (free tier)**
-- Why: Industry standard, Claude Code is excellent at it, Vercel auto-deploys on push with zero config, free tier covers MVP traffic (100GB bandwidth/month)
-- Cost: Free
+**Order matters: reason first, then ground — never retrieve-then-gag.** Learned from a
+real field test (Star Health bursitis case, June 2026) where naive RAG inverted its own
+lead argument and conceded the insurer's case.
 
-### Database + Vector Search + Storage
-**Supabase (PostgreSQL + pgvector extension + file storage)**
-- Why: One service handles relational DB, vector embeddings, and file storage — no separate vector DB subscription, no extra services, no extra bills
-- pgvector with HNSW indexes handles our KB size (<100K chunks) at 5–8ms query latency
-- **Important implementation detail**: PostgREST (Supabase's API layer) does NOT support pgvector similarity operators directly. All vector search queries MUST be wrapped in a PostgreSQL function and called via Supabase's `rpc()` method. Claude Code will implement this correctly — session prompts include the exact SQL.
-- Cost: Free tier (500MB DB, 1GB storage) — sufficient for MVP
+For both analysis and every letter (`lib/reasoning.ts`):
 
-### Embeddings
-**Voyage AI — model: `voyage-law-2`**
-- Why: Specifically fine-tuned for legal document retrieval. 1024 dimensions, 16,000 token context. Outperforms OpenAI text-embedding-3-large on legal retrieval benchmarks.
-- The KB is all English legal content (IRDAI circulars, ombudsman awards in English). Hindi documents are handled by Sarvam OCR upstream which extracts text that gets embedded in English.
-- API: voyageai.com — sign up, get API key
-- Cost: 200M free tokens. Our entire KB ingestion + months of queries won't touch this.
-- npm package: `voyageai`
+1. **STRATEGIZE** (Sonnet 4.6, temp 0) — from extracted facts + the category playbook,
+   enumerate candidate legal angles from first principles, not yet restricted to KB.
+2. **ADVERSARIAL CHECK** (Sonnet 4.6) — for each angle: "would the insurer's own
+   reviewer say this helps the claimant, or concedes their point?" Drop or repair every
+   concession. (Kills the "9 months < 24-month waiting period" class of error.)
+3. **GROUND** — per surviving angle, targeted hybrid retrieval (70% vector cosine via
+   voyage-law-2 + 30% Postgres full-text through the `match_kb_chunks` RPC — PostgREST
+   can't do pgvector ops directly). Top 10 → Tier-1 boost rerank → top 3.
+4. **CLASSIFY** — **VERIFIED** (grounded ≥0.65 in a Tier-1 regulation or real award →
+   assert strongly, attach `[Source:]`) vs **GENERAL PRINCIPLE** (model-known, not in
+   KB → labeled "general principle — confirm with an advisor", never a fabricated
+   citation). Real arguments survive even when the KB lacks them — honestly labeled.
+5. **SPAN-VALIDATE** cited claims — verbatim-containment check primary + token-overlap
+   coefficient secondary (numeric/§ tokens kept): ≥0.70 PASS; 0.40–0.69 FLAG (soften:
+   "may"/"appears to" + disclaimer); <0.40 FAIL.
 
-### OCR
-**Dual routing:**
-- If document contains >20% non-ASCII characters → **Sarvam Vision API** (84.3% accuracy on Indian documents, 22 Indian languages + English)
-- Otherwise → **Claude Haiku 4.5 Vision** (send PDF pages as base64 images)
-- Cost: Sarvam has free tier. Claude Haiku Vision costs ~₹15–20 per case.
+**Thresholds** (`lib/thresholds.ts` — canonical): retrieve 0.55, **gate 0.65 (floor —
+never lower)**, strong 0.80, span 0.70/0.40, post-payment fallback 0.40.
 
-### LLM — Extraction and Scoring
-**Claude Haiku 4.5 (`claude-haiku-4-5-20251001`)**
-- Why: Fast, cheap, excellent at structured JSON extraction
-- Used for: OCR fact extraction, rejection reason classification, fightability score calculation
-- Cost: ~₹15–20 per case
+**Pre-payment:** if nothing grounds ≥0.65 on a topic, don't generate on it; insert an
+advisor note; log the KB gap.
 
-### LLM — Dispute Letter Drafting
-**Claude Sonnet 4.6 (`claude-sonnet-4-6`)**
-- Why: Higher quality reasoning, better citation enforcement, more reliable instruction-following for the citation-gated pipeline
-- Used ONLY after user pays (post-payment gate)
-- Cost: ~₹60–65 per case
+**POST-PAYMENT GUARANTEE:** once paid, always deliver a complete, formal letter —
+≥400 words, ≥3 real inline citations. FAIL spans are SOFTENED, not deleted; a sentence
+is deleted ONLY when its citation references a chunk_id not in the retrieved set (true
+fabrication). The "consult an advisor" stub is BANNED for paid cases.
 
-### Total Variable Cost Per Case
-~₹82/case at 1,000 cases/month. Revenue: ₹99/case (MVP price). Gross margin ~17% at MVP price — this is intentionally thin; the goal is volume and proof of concept, not margin. Success fee model (Gopi's preferred pricing: ₹199 + tiered 5%/10% success fee) activates post-MVP when we have case volume.
+**Letter format:** formal Indian legal-correspondence English (no "I feel"/"kindly").
+Date → addressee (GRO/IRDAI/Ombudsman per stage) → subject → 3–5 numbered argument
+paragraphs each ending in `[Source:]` → fixed "I request" tri-clause (settle in full /
+2%-per-month interest / written response within 15 days) → escalation sentence →
+sign-off → enclosures reflecting docs actually uploaded → disclaimer footer ("Based on
+verified IRDAI regulations and ombudsman precedents… This is not legal advice.").
 
-### Payments
-**Razorpay**
-- Why: India-native, supports UPI + card + netbanking, 2% per transaction, widely trusted
-- Requires KYC — Asher must complete this himself (cannot be automated)
-- Cost: 2% per transaction only, no monthly fee
-
-### PDF Generation
-**`pdf-lib` or Puppeteer (via Vercel serverless function)**
-- Why: Free, runs in Vercel serverless, generates clean PDFs from HTML templates
-- Cost: Free
-
-### Email Delivery
-**Resend (resend.com)**
-- Why: 3,000 free emails/month on free tier, clean API, works great with Next.js
-- Cost: Free for MVP
+**Do not simplify, bypass, or add a "skip validation" flag. Ever.**
 
 ---
 
-## ENVIRONMENT VARIABLES
+## 8. MULTI-STAGE DISPUTE ENGINE (new in V4)
 
-All in `.env.local`. Never commit to git. `.env.example` (no real values) is committed.
+A case is a journey along the escalation ladder, not one letter. Each stage
+(`dispute_stages` row) is first-class: its own deadline, artifacts, status, filing
+walkthrough.
 
-```
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-VOYAGE_API_KEY=
-ANTHROPIC_API_KEY=
-SARVAM_API_KEY=
-RAZORPAY_KEY_ID=
-RAZORPAY_KEY_SECRET=
-RESEND_API_KEY=
-NEXT_PUBLIC_RAZORPAY_KEY_ID=
-```
-
-**API SETUP STATUS**: None of these have been set up yet. Each Claude Code session prompt will tell you exactly which keys you need for that session, where to sign up, and how to add them to Vercel.
-
----
-
-## DATABASE SCHEMA (Supabase)
-
-### Table: `cases`
-```sql
-CREATE TABLE cases (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  email TEXT,
-  status TEXT CHECK (status IN ('uploaded', 'analysed', 'paid', 'generated', 'delivered')) DEFAULT 'uploaded',
-  insurer TEXT,
-  claim_amount INTEGER, -- stored in paise (1 rupee = 100 paise)
-  rejection_reason_raw TEXT,
-  rejection_reason_category TEXT CHECK (rejection_reason_category IN (
-    'pre_existing_condition', 'policy_exclusion', 'documentation_incomplete',
-    'non_disclosure', 'waiting_period', 'cashless_denial',
-    'experimental_treatment', 'fraud_suspected', 'other'
-  )),
-  rejection_date DATE,
-  fightability_score TEXT CHECK (fightability_score IN ('low', 'medium', 'strong')),
-  fightability_reasons JSONB, -- array of {reason: string, citation: string|null}
-  document_path TEXT, -- Supabase Storage path
-  letter_path TEXT, -- path to generated dispute letter PDF
-  razorpay_order_id TEXT,
-  razorpay_payment_id TEXT,
-  paid_at TIMESTAMPTZ
-);
-```
-
-### Table: `kb_chunks`
-```sql
--- Enable pgvector first
-CREATE EXTENSION IF NOT EXISTS vector;
-
-CREATE TABLE kb_chunks (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  tier INTEGER CHECK (tier IN (1, 2, 3)),
-  source_title TEXT NOT NULL,
-  section_number TEXT,
-  date DATE,
-  circular_number TEXT,
-  issuer TEXT NOT NULL, -- e.g. "IRDAI", "Insurance Ombudsman", "NCDRC"
-  url TEXT,
-  content TEXT NOT NULL, -- the chunk text (400 tokens)
-  embedding VECTOR(1024), -- voyage-law-2 outputs 1024 dimensions
-  fts TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', content)) STORED
-);
-
--- HNSW index for fast vector search
-CREATE INDEX ON kb_chunks USING hnsw (embedding vector_cosine_ops);
-
--- Full-text search index
-CREATE INDEX ON kb_chunks USING GIN (fts);
-```
-
-### PostgreSQL Function for Hybrid Search (required — PostgREST cannot do vector ops directly)
-```sql
-CREATE OR REPLACE FUNCTION match_kb_chunks(
-  query_embedding VECTOR(1024),
-  query_text TEXT,
-  match_threshold FLOAT DEFAULT 0.65,
-  match_count INT DEFAULT 10
-)
-RETURNS TABLE (
-  id UUID,
-  content TEXT,
-  source_title TEXT,
-  section_number TEXT,
-  circular_number TEXT,
-  issuer TEXT,
-  url TEXT,
-  tier INTEGER,
-  similarity FLOAT
-)
-LANGUAGE SQL STABLE
-AS $$
-  SELECT
-    kc.id,
-    kc.content,
-    kc.source_title,
-    kc.section_number,
-    kc.circular_number,
-    kc.issuer,
-    kc.url,
-    kc.tier,
-    -- Hybrid score: 70% vector similarity + 30% BM25-style full-text
-    (0.7 * (1 - (kc.embedding <=> query_embedding))) +
-    (0.3 * ts_rank(kc.fts, plainto_tsquery('english', query_text))) AS similarity
-  FROM kb_chunks kc
-  WHERE
-    (1 - (kc.embedding <=> query_embedding)) > match_threshold
-  ORDER BY similarity DESC
-  LIMIT match_count;
-$$;
-```
-
-### Row Level Security (RLS)
-RLS must be enabled on both tables. Cases table: users can only read their own cases (by session/email). KB chunks: public read, service-role-only write.
+- **Stages:** `gro → bima_bharosa → ombudsman → consumer_court` (consumer_court =
+  static guidance only). Status: `not_started|drafted|filed|awaiting_response|resolved|escalated`.
+- **Reuse-vs-rebuild:** at each stage after the first, `lib/stage-policy.ts` decides
+  `adapted` vs `rebuilt` (default: rebuild when new facts/docs entered — e.g. the
+  insurer's GRO reply — adapt when only the addressee/authority/tone changes). The
+  decision + plain-English reason is recorded on the stage row and surfaced to the
+  user. Either way the full REASON→GROUND→VALIDATE pipeline re-runs with updated facts.
+  The citation bar never drops at higher stages; ungrounded/softened-out claims never
+  carry forward.
+- **Artifacts** (`stage_artifacts`): grievance_letter, complaint_form,
+  statement_of_case, filing_walkthrough, cc_list, evidence_checklist — PDFs/JSON in
+  Storage under `documents/{caseId}/stages/{stage}/…`.
+- **Bima Bharosa co-pilot:** generates every field's exact text, computes the deadline,
+  renders a step-by-step portal walkthrough. Assisted filing only (see §4).
+- **₹299 covers all stages of a case.** Stage gating uses `paid_at`, not status.
 
 ---
 
-## FOLDER STRUCTURE
+## 9. ACCOUNTS & CASE VAULT (new in V4)
 
-```
-/claimright-code
-├── /app                                    ← Next.js App Router pages
-│   ├── page.tsx                            ← Screen 1: Landing page
-│   ├── /upload
-│   │   └── page.tsx                        ← Screen 2: Upload
-│   ├── /analysis
-│   │   └── [caseId]
-│   │       └── page.tsx                    ← Screen 3: Analysis results
-│   ├── /pay
-│   │   └── [caseId]
-│   │       └── page.tsx                    ← Screen 4: Payment
-│   ├── /download
-│   │   └── [caseId]
-│   │       └── page.tsx                    ← Screen 5: Download/delivery
-│   └── /api
-│       ├── /upload
-│       │   └── route.ts                    ← Handle PDF upload → Supabase Storage
-│       ├── /analyse
-│       │   └── route.ts                    ← OCR + extraction + retrieval + scoring
-│       ├── /generate
-│       │   └── route.ts                    ← Dispute letter generation (post-payment)
-│       ├── /payment
-│       │   └── route.ts                    ← Razorpay order creation
-│       ├── /payment
-│       │   └── /verify
-│       │       └── route.ts                ← Razorpay webhook verification
-│       └── /kb
-│           └── /ingest
-│               └── route.ts               ← KB ingestion (admin only, protected)
-├── /lib                                    ← Shared utilities
-│   ├── supabase.ts                         ← Supabase client (client + server)
-│   ├── voyage.ts                           ← Voyage AI embedding client
-│   ├── claude.ts                           ← Anthropic API client
-│   ├── sarvam.ts                           ← Sarvam Vision OCR client
-│   ├── ocr.ts                              ← OCR routing logic
-│   ├── retrieval.ts                        ← Hybrid search + reranking
-│   ├── scoring.ts                          ← Fightability score calculation
-│   ├── generation.ts                       ← Dispute letter + span validation
-│   └── pdf.ts                              ← PDF generation
-├── /types
-│   ├── case.ts                             ← Case schema types
-│   ├── kb.ts                               ← KB chunk schema types
-│   └── api.ts                              ← API response types
-├── /scripts                                ← Run manually to build KB
-│   ├── ingest-irdai.ts                     ← Chunk + embed IRDAI circulars
-│   ├── ingest-awards.ts                    ← Chunk + embed ombudsman awards
-│   └── validate-kb.ts                      ← Check KB coverage
-├── /prompts                                ← LLM system prompts (versioned here)
-│   ├── extraction.ts                       ← Haiku extraction system prompt
-│   ├── scoring.ts                          ← Haiku scoring system prompt
-│   └── generation.ts                       ← Sonnet generation system prompt
-├── CLAUDE.md                               ← This file
-├── .env.local                              ← NEVER commit
-├── .env.example                            ← Commit this (no real values)
-├── package.json
-├── tsconfig.json
-├── tailwind.config.ts
-└── next.config.ts
-```
+- Supabase Auth email OTP (magic-link/OTP). First analysis stays frictionless —
+  anonymous upload works; the case binds to an account at or before payment.
+- Binding: upload sets a session cookie → `cases.session_id`; pay page has an inline
+  OTP step; `POST /api/cases/[caseId]/claim` binds when `user_id IS NULL AND (session
+  match OR email match)`; payment/verify auto-claims.
+- `/vault` — all the user's cases. `/vault/[caseId]` — stage timeline, deadline chips,
+  document vault grouped by stage, generation-decision card, advance dialog.
+- Ownership checks live in API routes (service client + `case.user_id === user.id`);
+  middleware only refreshes tokens on `/vault` and `/auth`.
 
 ---
 
-## 9 CANONICAL REJECTION REASON CATEGORIES
+## 10. STACK & SCHEMA (decisions final — don't re-litigate)
 
-All extraction must map to exactly one of these. No exceptions.
+Next.js 14 (App Router) + Tailwind on Vercel. Supabase (Postgres + pgvector HNSW +
+Storage + Auth). Voyage `voyage-law-2` (1024-dim). OCR: Sarvam Vision first for PDFs
+(handles Indian languages + English), Claude Haiku 4.5 Vision fallback and for images.
+**Runtime models: Haiku 4.5 (`claude-haiku-4-5-20251001`) for OCR + raw extraction;
+Sonnet 4.6 (`claude-sonnet-4-6`) for strategize/adversarial/letters. Never Opus or
+Fable at runtime** (unit economics — every cost change shown as a bottoms-up per-case
+delta). Razorpay (test mode until the live gate passes). pdf-lib. Resend (domain:
+claimright.in — do not switch until ashray.in is verified). Upstash Redis rate-limit +
+Cloudflare Turnstile (both optional with graceful fallbacks).
 
-| Code | Label | Description | Typical Fightability |
-|------|-------|-------------|----------------------|
-| `pre_existing_condition` | Pre-existing Condition | Insurer claims condition existed before policy start | Depends on moratorium (60 months = STRONG) |
-| `policy_exclusion` | Policy Exclusion | Insurer invokes a specific policy exclusion clause | Low–Medium (depends on clause clarity) |
-| `documentation_incomplete` | Documentation Incomplete | Missing documents — often a stalling tactic | STRONG (IRDAI prohibits piecemeal requests) |
-| `non_disclosure` | Non-disclosure | Insurer alleges material non-disclosure at purchase | Low unless moratorium passed |
-| `waiting_period` | Waiting Period | Treatment falls within waiting period | Strong if waiting period has passed |
-| `cashless_denial` | Cashless Denial | Cashless authorization denied | Strong (IRDAI: 1hr/3hr pre-auth rules) |
-| `experimental_treatment` | Experimental Treatment | Treatment deemed experimental/non-standard | Medium (treating doctor cert often overturns) |
-| `fraud_suspected` | Fraud Suspected | Insurer suspects fraud | Low — different handling needed |
-| `other` | Other | Doesn't fit above categories | Varies |
+**Price: ₹299 flat per case, all stages. Never use "% of claim" or "no success fee"
+copy** (a success-fee tier comes later).
 
----
+### Schema (live + V4 additions)
+- `cases`: id, created_at, email, status (`uploaded|analysed|paid|generated|delivered`
+  — the funnel state machine; per-stage progress lives in `dispute_stages.status`),
+  insurer, claim_amount (paise), rejection_reason_raw/category, rejection_date,
+  fightability_score/numeric/reasons, evidence_summaries, point_by_point_analysis,
+  document_path, letter_path, razorpay ids, paid_at, **user_id (nullable FK
+  auth.users), session_id** (V4).
+- `case_documents`: id, case_id, doc_type, storage_path, ocr_text, extracted_facts.
+- `kb_chunks`: id, tier (1/2/3), source_title, section_number, date, circular_number,
+  issuer, url, content, embedding VECTOR(1024), fts, **authority_type
+  (`definition|regulation|precedent`)** (V4). A chunk without complete metadata is NOT
+  ingested; chunks with date/citation contradictions are excluded from retrieval.
+- **`dispute_stages`** (V4): id, case_id, stage, status, deadline_date, filed_at,
+  generation_decision (`adapted|rebuilt`), generation_reason, generation_started_at,
+  UNIQUE(case_id, stage).
+- **`stage_artifacts`** (V4): id, stage_id, artifact_type, storage_path, generated_at.
+- `match_kb_chunks(query_embedding, query_text, match_threshold, match_count)` RPC —
+  similarity = `0.7*(1-cosine) + 0.3*ts_rank`.
+- RLS on every table. Migrations in `supabase/migrations/` — **Claude Code never runs
+  them; Asher pastes them into Supabase Studio.**
 
-## FIGHTABILITY SCORING LOGIC (MVP — Rules-Based, Not ML)
+### Coding rules (non-negotiable)
+TypeScript only; no `any`; Zod at all external boundaries; every external API call has
+try/catch + timeout + fallback; every LLM call ≤30s timeout; never commit secrets;
+files under UUID paths; strip patient name/phone/Aadhaar/policy-number before any text
+goes to an LLM (reinsert client-side only in the final PDF); rate-limit all public API
+routes; `npx tsc --noEmit` = 0 errors before any session is done; ≤3 LLM calls on any
+blocking request path; cache so a refresh never re-runs AI.
 
-**Output**: `fightability_score: 'low' | 'medium' | 'strong'` + `fightability_reasons` array (max 3 items, each with `reason` string + `citation` string or null)
-
-**Scoring Rules (apply top-down; Strong overrides Medium overrides Low):**
-
-### STRONG if ANY of:
-- KB retrieval returned a regulation match with similarity ≥ 0.80 (clear IRDAI violation)
-- Insurer sent 2+ separate document requests for same claim (piecemeal = IRDAI violation)
-- Insurer took >30 days to settle a reimbursement claim OR >1hr/3hr for cashless pre-auth
-- Ombudsman precedent found for same rejection reason AND same or similar insurer
-- Rejection reason is `documentation_incomplete` (overwhelmingly overturned at ombudsman)
-- Rejection reason is `pre_existing_condition` AND policy is >60 months old (PPOI moratorium)
-- Rejection reason is `cashless_denial` (IRDAI 1hr/3hr rule gives clear grounds)
-
-### MEDIUM if ANY of:
-- KB retrieval returned a regulation match with similarity 0.65–0.79
-- Ombudsman precedent found (different insurer, same rejection reason)
-- Rejection reason is `waiting_period` and timing is unclear
-- Days since rejection > 7 but < 30 (still fully within GRO window)
-
-### LOW if:
-- Rejection reason is `fraud_suspected` (cannot help effectively in MVP)
-- No KB match found (similarity < 0.65) on any aspect
-- Policy exclusion is clear, unambiguous, and directly applicable
-- Rejection reason is `non_disclosure` with less than 60 months of policy age
-
----
-
-## CODING RULES (NON-NEGOTIABLE)
-
-1. **TypeScript only.** No `.js` files except config files (`next.config.ts`, `tailwind.config.ts`).
-2. **No `any` types.** All types must be explicit. Use generics where needed.
-3. **All API responses validated with Zod at runtime.** No unvalidated external data.
-4. **All external API calls (Claude, Voyage, Sarvam, Razorpay) must have try/catch + timeout + fallback.**
-5. **Never commit secrets.** All keys in `.env.local` only. The `.env.example` has all keys with empty values.
-6. **Every LLM call must have a timeout** (30 seconds max) and a graceful error response.
-7. **The citation-gated pipeline is not optional.** Do not simplify it, bypass it, or add a "skip validation" flag.
-8. **Supabase Row Level Security (RLS) must be enabled** on all tables before any data is stored.
-9. **All user-uploaded files stored in Supabase Storage with UUID paths** — never the original filename.
-10. **PII handling**: Strip or anonymize patient name and phone number from all extracted facts before storing. Store only case data needed for dispute generation. No Aadhaar numbers anywhere.
-11. **Rate limiting on all public API routes**: 5 requests per IP per minute using a simple in-memory store. Prevents API cost abuse.
-12. **Clean TypeScript compile required**: Every session ends with `npx tsc --noEmit` returning 0 errors.
+### Design system — "Dawn Sky"
+White + sky blue + sunshine gold; base mist `#F4FAFE` (never cream/parchment — that was
+old ClaimRight). No orange, no generic AI-gradient look. Headings: Redaction
+(self-hosted, SIL OFL 1.1); body/mono: IBM Plex Sans / IBM Plex Mono. WebGL dawn-sky
+hero (drifting clouds, cursor-following sun) is part of the identity. Emotional job:
+the user just had a claim rejected — radiate hope, trust, clarity.
 
 ---
 
-## DESIGN SYSTEM (Reference Only — Do Not Copy Code)
+## 11. EVAL GATE (nothing ships if a golden case regresses)
 
-The file at `../landing.html` has good design language but code bugs. Reference it for:
-- Color palette: deep navy (`#0f1f2e`), white, accent green (`#1f3b2a`)
-- Typography: DM Serif Display (headings), DM Sans (body), JetBrains Mono (code/citations)
-- Component patterns: trust strips, score badges, citation pills
-- Copy: hero headline, stats strip, trust signals
-
-Do NOT import or copy any JavaScript from `landing.html`. Rebuild all interactive elements in React.
-
----
-
-## SERVICES TO SIGN UP FOR (ASHER DOES THESE — NOT CLAUDE CODE)
-
-You have not set up any of these yet. Each Claude Code session will tell you exactly which ones to set up for that session. Do not set them all up at once — do them as you get to each session.
-
-| # | Service | URL | What you'll get | When to do it |
-|---|---------|-----|-----------------|---------------|
-| 1 | Supabase | supabase.com | Project URL + anon key + service role key | Before Session 1 |
-| 2 | Voyage AI | voyageai.com | API key (200M free tokens) | Before Session 2 |
-| 3 | Anthropic API | console.anthropic.com | API key (separate from Claude subscription) | Before Session 3 |
-| 4 | Sarvam AI | sarvam.ai | API key (free credits) | Before Session 3 |
-| 5 | Razorpay | razorpay.com | Key ID + Key Secret (requires KYC — do it early) | Before Session 7 |
-| 6 | Resend | resend.com | API key (3,000 free emails/month) | Before Session 7 |
-| 7 | Vercel | vercel.com | Free account (connect GitHub repo) | Before Session 8 |
-| 8 | Domain | Cloudflare or Namecheap | claimright.in (~₹800/yr) | Whenever, needed for Session 8 |
-
-**Razorpay KYC takes 2–7 business days. Start it early (ideally before Session 5 so it's ready by Session 7).**
+- `scripts/eval/golden-cases.json` — seeded with the Star Health bursitis case
+  (₹30,885, Excl.02 F, policy 04-Feb-25→03-Feb-26, admission 06-Nov-25, ~91-day delay).
+  Correct angles: (1) trochanteric bursitis is acute/unlisted → Excl.02 misapplied;
+  (2) 91-day delay + piecemeal requests → timeline violation. `must_not_say`: never
+  argue "policy only ~9 months old, short of the 24-month period" as pro-claimant.
+- Each case: `expected_angles`, `expected_citations`, `must_not_say` + a raw-Sonnet
+  baseline (`docs/eval-baseline.md`) so "at least as good as the ungated model" is
+  measurable.
+- Retrieval benchmark (recall@5 / MRR) in `docs/retrieval-baseline.md`; re-run after
+  every KB change.
+- A test must prove a fabricated citation gets caught.
 
 ---
 
-## HOW ASHER USES CLAUDE CODE
+## 12. OUT OF SCOPE
 
-- Claude Code is accessed through the Claude desktop app (Cowork mode), not the terminal
-- Each session is a separate conversation. Paste the session prompt, let Claude Code run
-- No terminal commands needed. Claude Code does everything.
-- Verify each session by following the VERIFICATION section at the end of each session prompt
-- When starting a new session, Claude Code reads CLAUDE.md first — it has all the context
+Any non-health vertical · server-side auto-filing on government portals · success-fee
+billing tier · WhatsApp automation · HITL admin panel · automated consumer-court filing
+· native mobile app · A/B testing · blog · multi-language UI beyond OCR needs.
 
 ---
 
-## INSTRUCTIONS FOR CLAUDE CODE IN EVERY SESSION
+## 13. HOW ASHER WORKS
 
-1. **Read this CLAUDE.md completely before writing a single line of code**
-2. Check the session prompt for which API keys are needed — do not proceed if keys are missing from `.env.local`
-3. Follow the folder structure exactly as defined in this file
-4. All TypeScript must compile clean (`npx tsc --noEmit`) before the session is considered done
-5. The citation-gated pipeline in `generation.ts` is sacred — do not simplify it
-6. The similarity threshold of 0.65 is a floor — never lower it
-7. End every session by running the verification steps listed at the bottom of the session prompt
+Claude Code runs inside the Claude desktop app (Cowork). Each session reads THIS file
+first, works in phases, commits after each phase, and updates `PROGRESS.md` so any
+session can resume from the last commit. `FEATURES.md` is the definition of done — flip
+items only with observed evidence. End every session with `npx tsc --noEmit` clean.
+Claude Code never runs Supabase migrations and never flips Razorpay to live.

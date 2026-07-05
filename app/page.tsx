@@ -5,7 +5,7 @@ const trustStats = [
   {
     value: "94.5%",
     label:
-      "of complaints taken to the insurance ombudsman were resolved in the policyholder's favour last year (FY 2023–24).",
+      "of complaints taken to the insurance ombudsman were resolved last year — 52,575 cases (FY 2023–24).",
   },
   {
     value: "₹26,037 Cr",

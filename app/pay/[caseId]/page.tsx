@@ -68,7 +68,7 @@ export default function PayPage() {
   // Prefetch case email for Razorpay prefill
   useEffect(() => {
     if (!caseId) return
-    fetch(`/api/analyse?caseId=${caseId}`)
+    fetch(`/api/case/${caseId}/email`)
       .then((r) => r.json())
       .then((d: { email?: string }) => { if (d.email) setEmail(d.email) })
       .catch(() => {})

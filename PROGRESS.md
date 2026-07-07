@@ -171,6 +171,20 @@ Asher must, in the live Supabase project:
      custom SMTP later for volume).
   3. Re-ingest is NOT needed (KB already at 78 chunks live); migration 012 just
      backfills authority_type on the existing rows.
+**2026-07-06 — migrations applied, one follow-up grant pending.** Asher ran 008–012.
+Verified live: cases.user_id ✓, kb_chunks.authority_type 78/78 ✓. BUT dispute_stages /
+stage_artifacts 403'd — migration 010 enabled RLS without GRANTing service_role
+(same bug class as 004). Fixed: grants added to 010 + standalone migration 013.
+**Asher must run migration 013 (2 GRANT lines) in Studio before Phase 6.** Also fixed
+2 lint errors that blocked `next build` (build now green, all routes compile).
+
+When Asher runs 013 + replies "done": resume at **Phase 6** — end-to-end browser
+verification. NOTE: preview MCP is rooted in the hopeful-khorana worktree, not this
+one — start the dev server directly in THIS worktree (launch.json → next dev :3000)
+and drive it; anonymous funnel + dispute engine both work via the cr_sid cookie path
+without OTP (canAccessCase allows unowned cases by cookie), so OTP email (unreadable
+here) is not a hard blocker for verifying the dispute engine.
+
 When Asher replies "done": resume at **Phase 6** — end-to-end browser verification
 with the real test PDF (scripts/test-docs/test-rejection-letter.pdf.pdf), flipping
 FEATURES.md items with observed evidence. Then Phase 7 (unit-economics doc from

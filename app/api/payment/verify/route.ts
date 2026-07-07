@@ -81,6 +81,16 @@ export async function POST(
     paid_at: new Date().toISOString(),
   }).eq('id', caseRow.id)
 
+  // Auto-claim: bind the case to the signed-in account (if any) so it appears
+  // in the vault without a separate claim step.
+  if (caseRow.user_id === null) {
+    const { getAuthenticatedUser } = await import('@/lib/auth')
+    const user = await getAuthenticatedUser()
+    if (user) {
+      await typedUpdate(supabase, { user_id: user.id }).eq('id', caseRow.id)
+    }
+  }
+
   // Generation happens lazily when the client polls /api/download/[caseId].
   // Fire-and-forget is avoided because Vercel kills serverless functions once
   // the response is sent, which caused generation to silently fail.

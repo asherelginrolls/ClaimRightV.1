@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { PaymentOrderResponse, ApiError } from '@/types/api'
+import { createBrowserClient } from '@/lib/supabase-browser'
+import { OtpSignIn } from '@/app/components/OtpSignIn'
 
 interface RazorpayPaymentResponse {
   razorpay_order_id: string
@@ -50,6 +52,28 @@ export default function PayPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [scriptLoaded, setScriptLoaded] = useState(false)
+  // null = still checking; the pay button waits for a signed-in account so the
+  // case lands in the user's vault (claimed via /api/cases/[caseId]/claim).
+  const [signedIn, setSignedIn] = useState<boolean | null>(null)
+
+  const claimCase = useCallback(async () => {
+    try {
+      await fetch(`/api/cases/${caseId}/claim`, { method: 'POST' })
+    } catch {
+      // Non-fatal: payment/verify auto-claims as a fallback.
+    }
+  }, [caseId])
+
+  useEffect(() => {
+    const supabase = createBrowserClient()
+    supabase.auth
+      .getUser()
+      .then(({ data }) => {
+        setSignedIn(!!data.user)
+        if (data.user) void claimCase()
+      })
+      .catch(() => setSignedIn(false))
+  }, [claimCase])
 
   // Load Razorpay checkout script
   useEffect(() => {
@@ -181,12 +205,40 @@ export default function PayPage() {
           </ul>
         </div>
 
+        {/* Account step: the case must belong to an account so every letter
+            and stage stays accessible in the vault. */}
+        {signedIn === false && (
+          <div className="mb-6 rounded-2xl border border-rule bg-paper px-6 py-5 shadow-lift">
+            <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.18em] text-slate-faint">
+              One quick step
+            </p>
+            <p className="mb-4 font-sans text-sm leading-relaxed text-slate">
+              Sign in with your email so this case — and every letter we generate for it — stays
+              saved in your vault, at every stage of the dispute.
+            </p>
+            <OtpSignIn
+              compact
+              initialEmail={email}
+              onSignedIn={() => {
+                setSignedIn(true)
+                void claimCase()
+              }}
+            />
+          </div>
+        )}
+
         {/* Price + CTA */}
         <div className="rounded-2xl border border-rule bg-paper px-6 py-6 shadow-lift">
           <div className="mb-5 flex items-baseline justify-between">
-            <p className="font-sans text-sm font-medium text-slate">One-time, for this case</p>
+            <p className="font-sans text-sm font-medium text-slate">
+              One-time — covers every stage of this case
+            </p>
             <p className="font-display text-4xl font-semibold text-ink-deep">₹299</p>
           </div>
+          <p className="-mt-3 mb-5 font-sans text-xs leading-relaxed text-slate-faint">
+            Grievance officer letter today, and the Bima Bharosa and ombudsman documents when you
+            need them — no extra charge.
+          </p>
 
           {error && (
             <div className="mb-4 rounded-xl border border-coral bg-coral/10 px-4 py-3">
@@ -196,10 +248,10 @@ export default function PayPage() {
 
           <button
             onClick={handlePayment}
-            disabled={loading || !scriptLoaded}
+            disabled={loading || !scriptLoaded || signedIn !== true}
             className="w-full rounded-full bg-blue px-6 py-4 font-sans text-base font-semibold text-white shadow-lift transition-colors hover:bg-blue-deep disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading ? 'Processing…' : 'Pay ₹299 securely'}
+            {loading ? 'Processing…' : signedIn === false ? 'Sign in above to continue' : 'Pay ₹299 securely'}
           </button>
 
           <p className="mt-4 text-center font-mono text-[10px] tracking-wide text-slate-faint">

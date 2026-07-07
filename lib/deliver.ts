@@ -36,6 +36,42 @@ export async function generateAndDeliver(
 
   await typedUpdate(supabase, { status: 'generated', letter_path: pdfPath }).eq('id', caseId)
 
+  // Dispute engine: record the GRO stage + its letter artifact (idempotent).
+  // Non-fatal — delivery of the paid letter never depends on the stage tables
+  // existing (they arrive with migrations 010+).
+  try {
+    type StageInsert = Database['public']['Tables']['dispute_stages']['Insert']
+    type ArtifactInsert = Database['public']['Tables']['stage_artifacts']['Insert']
+    const stageInsert: StageInsert = { case_id: caseId, stage: 'gro', status: 'drafted' }
+    await (
+      supabase.from('dispute_stages').upsert as unknown as (
+        v: StageInsert,
+        o: { onConflict: string; ignoreDuplicates: boolean }
+      ) => Promise<{ error: unknown }>
+    )(stageInsert, { onConflict: 'case_id,stage', ignoreDuplicates: true })
+    const { data: stageRow } = await supabase
+      .from('dispute_stages')
+      .select('id')
+      .eq('case_id', caseId)
+      .eq('stage', 'gro')
+      .single()
+    if (stageRow) {
+      const artifactInsert: ArtifactInsert = {
+        stage_id: (stageRow as { id: string }).id,
+        artifact_type: 'grievance_letter',
+        storage_path: pdfPath,
+      }
+      await (
+        supabase.from('stage_artifacts').upsert as unknown as (
+          v: ArtifactInsert,
+          o: { onConflict: string }
+        ) => Promise<{ error: unknown }>
+      )(artifactInsert, { onConflict: 'stage_id,artifact_type' })
+    }
+  } catch (err) {
+    console.warn('[deliver] GRO stage record skipped:', err instanceof Error ? err.message : String(err))
+  }
+
   const { data: urlData } = await supabase.storage
     .from('documents')
     .createSignedUrl(pdfPath, 60 * 60 * 24)

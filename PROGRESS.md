@@ -111,16 +111,68 @@ commit + an update here. FEATURES.md is the definition of done.
   - NOTE: Sonnet calls need explicit timeouts (60s strategize / 120s letter — 30s
     default times out). Anthropic+Voyage+Supabase keys all verified working.
     Voyage free tier = 3 RPM (space bulk ops ~21s).
-- [ ] **Phase 4 — Auth + vault + dispute engine**
-- [ ] **Phase 5 — Stage artifacts + Bima Bharosa co-pilot**
-- [ ] **⏸ MIGRATION PAUSE** (008–0xx SQL to Asher, Supabase email-OTP setup)
+- [x] **Phase 4 — Auth + vault + dispute engine** (CODE-COMPLETE, tsc clean; runtime
+      verification deferred to Phase 6 — needs migrations 009–012 applied)
+  - Auth: `middleware.ts` (session refresh on /vault + /auth), `lib/auth.ts`
+    (`getAuthenticatedUser` via cookie-wired server client; `canAccessCase` =
+    owned→owner-only, unowned→uploading `cr_sid` session), `app/auth/page.tsx` +
+    `app/components/OtpSignIn.tsx` (Supabase email-OTP), `lib/supabase-browser.ts`
+    (browser client moved out of lib/supabase.ts), header "My cases" link.
+  - Binding: `POST /api/cases/[caseId]/claim` (rule: user_id IS NULL AND (session
+    or email match)); pay page gains inline OTP before Razorpay; payment/verify
+    auto-claims the case to the signed-in user.
+  - Dispute engine: migrations 009 (cases.user_id), 010 (dispute_stages +
+    stage_artifacts, TEXT+CHECK, UNIQUE, generation_started_at lock, service-role
+    RLS), 011 (backfill GRO stage + letter artifact for paid cases), 012
+    (kb_chunks.authority_type + backfill). `lib/deadlines.ts` (pure file-by/
+    response-due per stage/status), `lib/stage-policy.ts` (`decideGenerationStrategy`
+    → adapted|rebuilt + plain-English reason).
+  - Routes: stages advance (order + paid_at gated, marks prior escalated), stages
+    GET (poll + lazy generation under a stale-lock, maxDuration 120), stages PATCH
+    ("I filed" → recompute deadline), documents POST (add insurer reply), artifacts
+    download (ownership → signed URL).
+  - Vault UI: `/vault` (case list), `/vault/[caseId]` (`CaseTimeline` — stage
+    timeline, deadline chips, decision card, advance dialog, doc vault), stage
+    workspace page. `lib/deliver.ts` gained an idempotent, NON-FATAL GRO stage +
+    artifact upsert (paid funnel never depends on the stage tables existing).
+  - ₹299 gates on `paid_at` (covers all stages), not status.
+- [x] **Phase 5 — Stage artifacts + Bima Bharosa co-pilot** (CODE-COMPLETE, tsc clean)
+  - `prompts/stage-framings.ts`: gro_grievance / bb_complaint / ombudsman_form_via
+    framings (headerBlock/reliefBlock/escalationBlock/systemSuffix); `generation.ts`
+    `assembleValidatedLetter` + `generateLetterFromAngles` take an optional `framing`
+    (a NO-OP when unset → Phase-3 GRO/eval path is byte-identical, no regression).
+  - `lib/artifacts.ts` `generateStageArtifacts(caseId, stage)`: re-runs the FULL
+    reasoning pipeline with stage framing + prior-stage context (insurer reply etc.),
+    renders the letter PDF, plus deterministic companions — Bima Bharosa
+    `filing_walkthrough` (6-step field-by-field portal JSON + trust note, NO portal
+    automation), ombudsman `evidence_checklist` + `cc_list`. Uploads to
+    documents/{caseId}/stages/{stage}/, upserts stage_artifacts, logs adapt/rebuild.
+  - `app/components/StageWorkspace.tsx` + `stage-shared.tsx` render the walkthrough
+    with copy buttons; consumer court = static guidance only.
+  - `scripts/eval/stage-letter-test.ts` added.
+- [ ] **⏸ MIGRATION PAUSE** (008–012 SQL to Asher, Supabase email-OTP setup) ← **NEXT: hand SQL to Asher**
 - [ ] **Phase 6 — End-to-end browser verification (flip FEATURES.md)**
 - [ ] **Phase 7 — Unit economics + docs + final gates**
 - [ ] **Phase 8 — Merge & live deploy**
 
 ## Notes for resuming sessions
 - Worktree: `.claude/worktrees/suspicious-hamilton-5a8a2d`, branch
-  `claude/suspicious-hamilton-5a8a2d`.
+  `claude/suspicious-hamilton-5a8a2d`. PR #18 open → main.
 - Razorpay is TEST mode. Email domain stays claimright.in on Resend.
-- Migrations 008+ are written but NOT applied until the migration pause.
-- Synthetic precedents still live in kb_chunks (purge is Phase 1.4).
+- Migrations 008–012 are written but NOT applied — they go to Asher at the pause.
+- Synthetic precedents already purged from live kb_chunks (Phase 3).
+
+## RESUME POINT (2026-07-06, Opus took over from Fable — Asher out of credits)
+Phases 0–5 are committed and tsc-clean. **We are at the MIGRATION PAUSE.**
+Asher must, in the live Supabase project:
+  1. Run migrations 008→012 (combined SQL block was handed to him).
+  2. Enable Email OTP auth in Supabase dashboard (Authentication → Providers →
+     Email → enable "Email OTP"/magic-link; default SMTP is fine for testing,
+     custom SMTP later for volume).
+  3. Re-ingest is NOT needed (KB already at 78 chunks live); migration 012 just
+     backfills authority_type on the existing rows.
+When Asher replies "done": resume at **Phase 6** — end-to-end browser verification
+with the real test PDF (scripts/test-docs/test-rejection-letter.pdf.pdf), flipping
+FEATURES.md items with observed evidence. Then Phase 7 (unit-economics doc from
+logged token counts) and Phase 8 (merge PR #18 → main → verify live Vercel site).
+Do NOT merge PR #18 until Phase 6 verification passes.

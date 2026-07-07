@@ -366,7 +366,10 @@ export function assembleValidatedLetter(
   caseFacts: CaseFacts,
   chunks: KbSearchResult[],
   llmOutput: LetterOutput,
-  options: { lowConfidence?: boolean } = {}
+  options: {
+    lowConfidence?: boolean
+    framing?: import('@/prompts/stage-framings').StageFraming
+  } = {}
 ): GenerationResult {
   // STEPS 4 + 5: SPAN VALIDATION + THRESHOLD FILTERING
   const chunkMap = new Map(chunks.map((c) => [c.id, c]))
@@ -403,12 +406,14 @@ export function assembleValidatedLetter(
     kbMissNote: options.lowConfidence
       ? 'This letter relies primarily on the procedural framework as direct category-specific regulations had limited match in our knowledge base.'
       : null,
-    headerBlock: LETTER_HEADER_TEMPLATE(
+    headerBlock: (options.framing?.headerBlock ?? LETTER_HEADER_TEMPLATE)(
       new Date().toISOString().slice(0, 10),
       caseFacts.insurer
     ),
-    triClauseBlock: LETTER_TRI_CLAUSE(Math.round(caseFacts.claimAmount / 100)),
-    escalationBlock: LETTER_ESCALATION_SENTENCE,
+    triClauseBlock: (options.framing?.reliefBlock ?? LETTER_TRI_CLAUSE)(
+      Math.round(caseFacts.claimAmount / 100)
+    ),
+    escalationBlock: options.framing?.escalationBlock ?? LETTER_ESCALATION_SENTENCE,
   }
 }
 
@@ -421,7 +426,8 @@ export function assembleValidatedLetter(
 
 export async function generateLetterFromAngles(
   caseFacts: CaseFacts,
-  reasoning: import('@/lib/reasoning').ReasoningResult
+  reasoning: import('@/lib/reasoning').ReasoningResult,
+  framing?: import('@/prompts/stage-framings').StageFraming
 ): Promise<GenerationResult> {
   // Chunks available for citation = merged retrieval + every angle's chunks.
   const chunkMap = new Map<string, KbSearchResult>()
@@ -469,10 +475,11 @@ export async function generateLetterFromAngles(
         max_tokens: 4096,
         temperature: 0,
         system:
-          attempt === 0
-            ? GENERATION_SYSTEM_PROMPT
-            : GENERATION_SYSTEM_PROMPT +
-              '\n\nIMPORTANT: your previous draft was truncated. Keep every body paragraph under 110 words and every snippet under 20 words so the complete JSON fits.',
+          GENERATION_SYSTEM_PROMPT +
+          (framing?.systemSuffix ?? '') +
+          (attempt === 0
+            ? ''
+            : '\n\nIMPORTANT: your previous draft was truncated. Keep every body paragraph under 110 words and every snippet under 20 words so the complete JSON fits.'),
         messages: [{ role: 'user', content: userContent }],
       },
       { timeout: 120_000 }
@@ -495,7 +502,7 @@ export async function generateLetterFromAngles(
   }
   if (!letterOutput) throw new Error('LLM returned invalid letter structure')
 
-  return assembleValidatedLetter(caseFacts, chunks, letterOutput, { lowConfidence })
+  return assembleValidatedLetter(caseFacts, chunks, letterOutput, { lowConfidence, framing })
 }
 
 // Flatten a GenerationResult into the plain-text letter (used by the eval

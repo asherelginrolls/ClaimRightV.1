@@ -151,7 +151,29 @@ commit + an update here. FEATURES.md is the definition of done.
     with copy buttons; consumer court = static guidance only.
   - `scripts/eval/stage-letter-test.ts` added.
 - [ ] **⏸ MIGRATION PAUSE** (008–012 SQL to Asher, Supabase email-OTP setup) ← **NEXT: hand SQL to Asher**
-- [ ] **Phase 6 — End-to-end browser verification (flip FEATURES.md)**
+- [x] **Phase 6 — End-to-end verification via the cr_sid cookie path** (2026-07-06)
+  - Migrations verified live: user_id ✓, authority_type 78/78 ✓; dispute tables 403'd
+    → fixed with grants (migration 013, Asher ran it) → now OK (6 GRO backfill rows).
+  - Full funnel driven live on the real test PDF: upload→analyse→payment→verify→download.
+    Bursitis case scores **STRONG (85)** with the correct Excl.02 "list-based exclusion"
+    angle + real [Source:] citations — NOT the inverted 9-vs-24 argument. Razorpay test
+    order (₹299), HMAC verify, delivery all pass.
+  - Full dispute ladder driven live: GRO→Bima Bharosa (decision=adapted)→Ombudsman
+    (decision=rebuilt), both reasons surfaced. Bima Bharosa complaint = **773 words,
+    5 real citations, no inversion**; 6-step filing walkthrough (per-field text, deadline,
+    trust note, no portal automation); ombudsman statement_of_case + evidence_checklist
+    (6) + cc_list (2). "I filed" recomputes deadline. Artifact signed-URL download works;
+    wrong cr_sid → **403**. Auth minted via admin key → vault page 200, correct case
+    header (insurer/STRONG/waiting-period/docs); unauth → 307 /auth.
+  - **KNOWN LIMITATION (not a product bug):** the preview harness serves correct SSR
+    HTML + assets (main-app.js 200/6MB, `next build` clean) but does not execute this
+    heavy dev bundle's client hydration — so interactive UI (score dial, vault timeline
+    chips, DecisionCard render) could not be screenshotted. Server render + every API/
+    data path verified correct. Confirm the interactive UI in a real browser post-deploy.
+  - tsc + next build both clean (fixed 2 lint blockers). FEATURES.md flipped with evidence.
+  - Test data left in live DB: case ad556e34…, user phase6-vault@ashray.test (harmless).
+  - NOT yet done: D6 (insurer-reply→rebuild), D8 (consumer-court guidance), A1 (real OTP
+    round-trip — needs a readable inbox), landing/analysis UI visuals.
 - [ ] **Phase 7 — Unit economics + docs + final gates**
 - [ ] **Phase 8 — Merge & live deploy**
 

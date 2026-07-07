@@ -44,3 +44,9 @@ CREATE INDEX IF NOT EXISTS idx_stage_artifacts_stage ON stage_artifacts(stage_id
 -- same pattern as cases/case_documents.
 ALTER TABLE dispute_stages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE stage_artifacts ENABLE ROW LEVEL SECURITY;
+
+-- Table grants: RLS gates row visibility, but PostgREST roles still need table
+-- privileges or the REST API 403s. Service-role only (no anon/authenticated) —
+-- ownership is enforced in the API routes, same pattern as cases/case_documents.
+GRANT SELECT, INSERT, UPDATE, DELETE ON dispute_stages TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON stage_artifacts TO service_role;

@@ -14,7 +14,6 @@ type CaseRow = Database['public']['Tables']['cases']['Row']
 type StageRow = Database['public']['Tables']['dispute_stages']['Row']
 type StageInsert = Database['public']['Tables']['dispute_stages']['Insert']
 type StageUpdate = Database['public']['Tables']['dispute_stages']['Update']
-type SupabaseClient = ReturnType<typeof createServiceClient>
 
 const BodySchema = z.object({
   toStage: z.enum(['bima_bharosa', 'ombudsman', 'consumer_court']),

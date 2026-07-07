@@ -68,7 +68,7 @@ export async function GET(
     return NextResponse.json({ error: 'Not your case.' }, { status: 403 })
   }
 
-  let { data: rawStages } = await supabase
+  const { data: rawStages } = await supabase
     .from('dispute_stages')
     .select('*')
     .eq('case_id', params.caseId)

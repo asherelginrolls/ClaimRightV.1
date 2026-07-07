@@ -33,6 +33,32 @@ export function getAnthropicClient(): Anthropic {
   return _client
 }
 
+// Optional per-call token-usage logging for cost measurement. Off unless
+// LOG_LLM_USAGE=true (kept out of the hot path in production). Emits a single
+// line per non-streaming call: `[usage] model=… in=… out=…`, which the
+// unit-economics pass tallies into a bottoms-up per-case cost.
+type MessagesApi = Anthropic['messages']
+type CreateFn = MessagesApi['create']
+
+function instrumentMessages(messages: MessagesApi): MessagesApi {
+  if (process.env.LOG_LLM_USAGE !== 'true') return messages
+  const originalCreate = messages.create.bind(messages) as CreateFn
+  const wrappedCreate = (async (body: Parameters<CreateFn>[0], options?: Parameters<CreateFn>[1]) => {
+    const res = await originalCreate(body, options)
+    if (res && typeof res === 'object' && 'usage' in res && res.usage) {
+      const model = body && typeof body === 'object' && 'model' in body ? body.model : 'unknown'
+      console.info(`[usage] model=${model} in=${res.usage.input_tokens} out=${res.usage.output_tokens}`)
+    }
+    return res
+  }) as CreateFn
+  return new Proxy(messages, {
+    get(target, prop, receiver) {
+      if (prop === 'create') return wrappedCreate
+      return Reflect.get(target, prop, receiver)
+    },
+  })
+}
+
 // Convenience aliases used throughout the codebase
-export const haiku = { get messages() { return getAnthropicClient().messages } }
+export const haiku = { get messages() { return instrumentMessages(getAnthropicClient().messages) } }
 export const sonnet = haiku

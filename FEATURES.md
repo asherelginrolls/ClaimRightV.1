@@ -64,6 +64,6 @@ verification in Phase 6.
 
 ## Quality gates (Phase 7)
 - [x] Q1. npx tsc --noEmit = 0 errors; next build succeeds — evidence: both clean this pass (2 lint blockers fixed)
-- [ ] Q2. docs/unit-economics.md: bottoms-up per-case cost from actual token counts at 1,000 cases/month
+- [x] Q2. docs/unit-economics.md: bottoms-up per-case cost from actual token counts at 1,000 cases/month — evidence: measured live (Haiku+Sonnet usage logged), core paid case ≈ ₹23 AI / ~90% margin at ₹299
 - [ ] Q3. README + CLAUDE.md reflect shipped reality
 - [ ] Q4. Live Vercel deploy verified (landing, upload, analysis)

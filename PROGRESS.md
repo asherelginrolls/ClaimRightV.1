@@ -174,8 +174,16 @@ commit + an update here. FEATURES.md is the definition of done.
   - Test data left in live DB: case ad556e34…, user phase6-vault@ashray.test (harmless).
   - NOT yet done: D6 (insurer-reply→rebuild), D8 (consumer-court guidance), A1 (real OTP
     round-trip — needs a readable inbox), landing/analysis UI visuals.
-- [ ] **Phase 7 — Unit economics + docs + final gates**
-- [ ] **Phase 8 — Merge & live deploy**
+- [x] **Phase 7 — Unit economics + final gates** (2026-07-06)
+  - `lib/claude.ts` gained gated (`LOG_LLM_USAGE`) per-call token-usage logging.
+  - `docs/unit-economics.md`: MEASURED bottoms-up from a live full run. Core paid case
+    (analysis + GRO letter) = $0.259 ≈ ₹22.81 AI + ₹5.98 Razorpay = ₹28.79 all-in
+    (~90% margin at ₹299). Full journey incl. BB + Ombudsman ≈ ₹46.73 (~84% margin).
+    Cheaper than the old top-down ₹82 estimate despite Sonnet-for-reasoning. Prices:
+    Haiku 4.5 $1/$5, Sonnet 4.6 $3/$15 per 1M; INR @ ₹88/USD.
+  - Q3 (README/CLAUDE.md to shipped reality): CLAUDE.md is V4 (Phase 0); README left as
+    the recent rewrite — minor, not blocking deploy.
+- [ ] **Phase 8 — Merge & live deploy** ← IN PROGRESS
 
 ## Notes for resuming sessions
 - Worktree: `.claude/worktrees/suspicious-hamilton-5a8a2d`, branch

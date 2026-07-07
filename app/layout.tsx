@@ -26,12 +26,20 @@ export default function RootLayout({
         <header className="sticky top-0 z-50 border-b border-rule/80 bg-paper/70 backdrop-blur-md">
           <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
             <Wordmark />
-            <Link
-              href="/upload"
-              className="rounded-full border border-rule-strong bg-paper px-4 py-2 font-sans text-sm font-semibold text-blue-deep shadow-sm transition-colors hover:border-blue/40 hover:text-blue"
-            >
-              Check my claim →
-            </Link>
+            <div className="flex items-center gap-4">
+              <Link
+                href="/vault"
+                className="font-sans text-sm font-medium text-slate transition-colors hover:text-ink"
+              >
+                My cases
+              </Link>
+              <Link
+                href="/upload"
+                className="rounded-full border border-rule-strong bg-paper px-4 py-2 font-sans text-sm font-semibold text-blue-deep shadow-sm transition-colors hover:border-blue/40 hover:text-blue"
+              >
+                Check my claim →
+              </Link>
+            </div>
           </div>
         </header>
 

@@ -1,5 +1,6 @@
 import type { ExtractedFacts } from '@/types/api'
-import { GATING_FLOOR, type RetrievalResult } from '@/lib/retrieval'
+import type { RetrievalResult } from '@/lib/retrieval'
+import { GATING_FLOOR, STRONG_MATCH_THRESHOLD } from '@/lib/thresholds'
 import type { FightabilityScore, FightabilityReason } from '@/types/case'
 
 function clamp(value: number, min: number, max: number): number {
@@ -59,7 +60,7 @@ export function calculateFightabilityScore(
 
   const strongReasons: FightabilityReason[] = []
 
-  if (topScore >= 0.80 && chunks.length > 0) {
+  if (topScore >= STRONG_MATCH_THRESHOLD && chunks.length > 0) {
     strongReasons.push({
       reason: `A directly applicable IRDAI regulation was found that supports your dispute (match confidence: ${Math.round(topScore * 100)}%).`,
       citation: buildCitation(chunks[0]),
@@ -68,15 +69,15 @@ export function calculateFightabilityScore(
 
   if (facts.documents_requested_count !== null && facts.documents_requested_count >= 2) {
     strongReasons.push({
-      reason: `Your insurer sent ${facts.documents_requested_count} separate document requests for the same claim — a practice explicitly prohibited by the IRDAI Master Circular on Health Insurance.`,
-      citation: 'IRDAI Master Circular on Health Insurance (29.05.2024)',
+      reason: `Your insurer sent ${facts.documents_requested_count} separate document requests for the same claim — IRDAI requires insurers and TPAs to collect claim documents from the hospital themselves, and no claim may be rejected or closed for want of documents.`,
+      citation: 'IRDAI Master Circular on Health Insurance (29.05.2024); PPOI Master Circular (05.09.2024)',
     })
   }
 
   if (category === 'documentation_incomplete') {
     strongReasons.push({
-      reason: 'Claims rejected for incomplete documentation are overwhelmingly overturned at the ombudsman stage. IRDAI rules prohibit piecemeal document requests.',
-      citation: 'IRDAI Master Circular on Health Insurance (29.05.2024)',
+      reason: 'Claims rejected for incomplete documentation are overwhelmingly overturned at the ombudsman stage. IRDAI rules state that no claim shall be rejected or closed for want of documents.',
+      citation: 'PPOI Master Circular (05.09.2024)',
     })
   }
 
@@ -109,7 +110,7 @@ export function calculateFightabilityScore(
 
   const mediumReasons: FightabilityReason[] = []
 
-  if (topScore >= GATING_FLOOR && topScore < 0.80 && chunks.length > 0) {
+  if (topScore >= GATING_FLOOR && topScore < STRONG_MATCH_THRESHOLD && chunks.length > 0) {
     mediumReasons.push({
       reason: `A potentially applicable IRDAI regulation was found that may support your dispute (match confidence: ${Math.round(topScore * 100)}%).`,
       citation: buildCitation(chunks[0]),

@@ -32,7 +32,7 @@ const NEXT_STEPS = [
   {
     step: '03',
     title: 'Still stuck? The ombudsman',
-    body: "The insurance ombudsman is free, needs no lawyer, and resolved 94.5% of complaints in the policyholder's favour last year. File at cioins.co.in within a year.",
+    body: "The insurance ombudsman is free, needs no lawyer, and resolved 94.5% of the complaints it received last year. File at cioins.co.in within a year.",
   },
 ]
 

@@ -3,7 +3,7 @@ import { createServiceClient, type Database } from '@/lib/supabase'
 import { ensureOcrForDocs, downloadAndOcr } from '@/lib/ocr-docs'
 import { haiku } from '@/lib/claude'
 import { EXTRACTION_SYSTEM_PROMPT, EXTRACTION_USER_PROMPT } from '@/prompts/extraction'
-import { retrieveForCase } from '@/lib/retrieval'
+import { runReasoning } from '@/lib/reasoning'
 import { calculateFightabilityScore, computeNumericScore } from '@/lib/scoring'
 import { ExtractedFactsSchema } from '@/types/api'
 import type { AnalyseResponse, ApiError } from '@/types/api'
@@ -316,8 +316,9 @@ async function generateExplainersAndPointByPoint(args: {
   supportingFactsText: string
   chunks: Array<{ source_title: string; section_number: string | null; content: string; tier: number }>
   fightabilityReasons: Array<{ reason: string; citation: string | null }>
+  anglesText?: string
 }): Promise<{ explainers: string[]; pointByPoint: string[] }> {
-  const { extractedFacts, supportingFactsText, chunks, fightabilityReasons } = args
+  const { extractedFacts, supportingFactsText, chunks, fightabilityReasons, anglesText } = args
   const top3 = chunks.slice(0, 3)
 
   const explainerFallback = (): string[] =>
@@ -349,7 +350,7 @@ async function generateExplainersAndPointByPoint(args: {
       )
       .join('\n\n---\n\n')
 
-    const userPrompt = `Case facts (extracted from the rejection letter):\n${JSON.stringify(extractedFacts, null, 2)}\n\nSupporting documents:\n${supportingFactsText || '(none provided)'}\n\nTop retrieved regulations / precedents:\n${chunksBlock}\n\nProduce TWO things as a single JSON object:\n1. "explainers": an array with exactly ${top3.length} strings, one per numbered chunk above, in order. Each is one plain-English sentence (under 20 words) explaining what rule that chunk contains and why it matters to a policyholder.\n2. "pointByPoint": an array of EXACTLY 6 strings. Each sentence must reference one concrete fact from the inputs above (a regulation §, an ombudsman precedent, the policy age in months, the bill amount, the number of piecemeal document requests, the diagnosis, or a specific exclusion). No generic statements. No marketing language. Plain English, under 30 words each.\n\nRespond with ONLY a JSON object: {"explainers": [...], "pointByPoint": [...]}.`
+    const userPrompt = `Case facts (extracted from the rejection letter):\n${JSON.stringify(extractedFacts, null, 2)}\n\nSupporting documents:\n${supportingFactsText || '(none provided)'}\n\nLegal angles already strategized for this case (use these — do not invent new ones):\n${anglesText || '(none)'}\n\nTop retrieved regulations / precedents:\n${chunksBlock}\n\nProduce TWO things as a single JSON object:\n1. "explainers": an array with exactly ${top3.length} strings, one per numbered chunk above, in order. Each is one plain-English sentence (under 20 words) explaining what rule that chunk contains and why it matters to a policyholder.\n2. "pointByPoint": an array of EXACTLY 6 strings. Each sentence must reference one concrete fact from the inputs above (a regulation §, an ombudsman precedent, the policy age in months, the bill amount, the number of piecemeal document requests, the diagnosis, or a specific exclusion). No generic statements. No marketing language. Plain English, under 30 words each.\n\nRespond with ONLY a JSON object: {"explainers": [...], "pointByPoint": [...]}.`
 
     const msg = await haiku.messages.create({
       model: 'claude-haiku-4-5-20251001',
@@ -404,6 +405,15 @@ export async function GET(
 
   if (!caseId) {
     return NextResponse.json({ error: 'caseId is required.' }, { status: 400 })
+  }
+
+  // Session cookie binding: verify this browser uploaded the case.
+  // Bypass in dev when SKIP_COOKIE_CHECK=true.
+  if (process.env.SKIP_COOKIE_CHECK !== 'true') {
+    const sessionCaseId = request.cookies.get('cr_sid')?.value
+    if (sessionCaseId !== caseId) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
+    }
   }
 
   try {
@@ -634,21 +644,52 @@ export async function GET(
       extractedFacts.policy_age_months
     const derivedDiagnosis = primaryDiagnosisFrom(supportingFacts)
 
-    // ── 4. KB retrieval (now with policy age + diagnosis hints) ───────────
-    console.info('[analyse] stage: retrieval-start')
-    const retrievalResult = await retrieveForCase({
-      insurerName: extractedFacts.insurer,
+    // ── 4. REASON → GROUND (CLAUDE.md §7): Sonnet strategize+adversarial,
+    // then per-angle grounding (one batched embed + per-angle RPC). Falls
+    // back internally to single-query retrieval if strategize fails.
+    console.info('[analyse] stage: reasoning-start')
+    const reasoning = await runReasoning({
+      insurer: extractedFacts.insurer,
+      claimAmountRupees: extractedFacts.claim_amount,
+      rejectionDate: extractedFacts.rejection_date,
       rejectionReasonRaw: extractedFacts.rejection_reason_raw,
-      rejectionReasonCategory: extractedFacts.rejection_reason_category,
-      claimAmount: extractedFacts.claim_amount,
+      category: extractedFacts.rejection_reason_category,
+      documentsRequestedCount: extractedFacts.documents_requested_count,
       policyAgeMonths: derivedPolicyAge,
       primaryDiagnosis: derivedDiagnosis,
+      extraContext: supportingFactsText || null,
     })
-    console.info('[analyse] stage: retrieval-end chunks=' + retrievalResult.chunks.length)
+    const retrievalResult = reasoning.merged
+    console.info(
+      '[analyse] stage: reasoning-end angles=' +
+        reasoning.angles.length +
+        ' verified=' +
+        reasoning.angles.filter((a) => a.classification === 'verified').length +
+        ' chunks=' +
+        retrievalResult.chunks.length +
+        (reasoning.usedFallback ? ' (fallback)' : '')
+    )
 
-    // ── 5. Fightability scoring (rules-based) ─────────────────────────────
+    // ── 5. Fightability scoring (rules-based, angle-aware reasons) ────────
     const factsForScoring = { ...extractedFacts, policy_age_months: derivedPolicyAge }
-    const { score, reasons } = calculateFightabilityScore(factsForScoring, retrievalResult)
+    const { score, reasons: ruleReasons } = calculateFightabilityScore(
+      factsForScoring,
+      retrievalResult
+    )
+    // Verified angles become the user-facing reasons (they're case-specific
+    // and adversarially checked); rules-based reasons fill any remaining
+    // slots. Cap 3.
+    const angleReasons = reasoning.angles
+      .filter((a) => a.classification === 'verified')
+      .map((a) => ({
+        reason: a.argument,
+        citation: a.chunks[0]
+          ? a.chunks[0].section_number
+            ? `${a.chunks[0].source_title}, §${a.chunks[0].section_number}`
+            : a.chunks[0].source_title
+          : null,
+      }))
+    const reasons = [...angleReasons, ...ruleReasons].slice(0, 3)
     const numericScore = computeNumericScore(retrievalResult, score)
     console.info('[analyse] stage: scoring-done score=' + score + ' numeric=' + numericScore)
 
@@ -659,6 +700,12 @@ export async function GET(
         supportingFactsText,
         chunks: retrievalResult.chunks,
         fightabilityReasons: reasons,
+        anglesText: reasoning.angles
+          .map(
+            (a) =>
+              `- [${a.classification === 'verified' ? 'VERIFIED' : 'GENERAL PRINCIPLE'}] ${a.title}: ${a.argument}`
+          )
+          .join('\n'),
       })
 
     const evidenceSummaries: EvidenceSummary[] = retrievalResult.chunks

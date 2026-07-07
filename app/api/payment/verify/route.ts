@@ -52,7 +52,12 @@ export async function POST(
     .update(`${razorpay_order_id}|${razorpay_payment_id}`)
     .digest('hex')
 
-  if (expectedSignature !== razorpay_signature) {
+  const expectedBuf = Buffer.from(expectedSignature, 'hex')
+  const receivedBuf = Buffer.from(razorpay_signature, 'hex')
+  const sigValid =
+    expectedBuf.length === receivedBuf.length &&
+    crypto.timingSafeEqual(expectedBuf, receivedBuf)
+  if (!sigValid) {
     return NextResponse.json({ error: 'Payment verification failed' }, { status: 400 })
   }
 
@@ -75,6 +80,16 @@ export async function POST(
     razorpay_payment_id,
     paid_at: new Date().toISOString(),
   }).eq('id', caseRow.id)
+
+  // Auto-claim: bind the case to the signed-in account (if any) so it appears
+  // in the vault without a separate claim step.
+  if (caseRow.user_id === null) {
+    const { getAuthenticatedUser } = await import('@/lib/auth')
+    const user = await getAuthenticatedUser()
+    if (user) {
+      await typedUpdate(supabase, { user_id: user.id }).eq('id', caseRow.id)
+    }
+  }
 
   // Generation happens lazily when the client polls /api/download/[caseId].
   // Fire-and-forget is avoided because Vercel kills serverless functions once

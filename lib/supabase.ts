@@ -1,4 +1,4 @@
-import { createServerClient, createBrowserClient as createSupabaseBrowserClient, type CookieOptions } from '@supabase/ssr'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 
@@ -37,6 +37,7 @@ export type Database = {
           razorpay_order_id: string | null
           razorpay_payment_id: string | null
           paid_at: string | null
+          user_id: string | null
         }
         Insert: {
           id?: string
@@ -68,6 +69,7 @@ export type Database = {
           razorpay_order_id?: string | null
           razorpay_payment_id?: string | null
           paid_at?: string | null
+          user_id?: string | null
         }
         Update: {
           id?: string
@@ -99,6 +101,7 @@ export type Database = {
           razorpay_order_id?: string | null
           razorpay_payment_id?: string | null
           paid_at?: string | null
+          user_id?: string | null
         }
       }
       case_documents: {
@@ -147,6 +150,69 @@ export type Database = {
           ocr_text?: string | null
           extracted_facts?: Record<string, unknown> | null
           uploaded_at?: string
+        }
+      }
+      dispute_stages: {
+        Relationships: []
+        Row: {
+          id: string
+          case_id: string
+          stage: 'gro' | 'bima_bharosa' | 'ombudsman' | 'consumer_court'
+          status: 'not_started' | 'drafted' | 'filed' | 'awaiting_response' | 'resolved' | 'escalated'
+          deadline_date: string | null
+          filed_at: string | null
+          generation_decision: 'adapted' | 'rebuilt' | null
+          generation_reason: string | null
+          generation_started_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          case_id: string
+          stage: 'gro' | 'bima_bharosa' | 'ombudsman' | 'consumer_court'
+          status?: 'not_started' | 'drafted' | 'filed' | 'awaiting_response' | 'resolved' | 'escalated'
+          deadline_date?: string | null
+          filed_at?: string | null
+          generation_decision?: 'adapted' | 'rebuilt' | null
+          generation_reason?: string | null
+          generation_started_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          case_id?: string
+          stage?: 'gro' | 'bima_bharosa' | 'ombudsman' | 'consumer_court'
+          status?: 'not_started' | 'drafted' | 'filed' | 'awaiting_response' | 'resolved' | 'escalated'
+          deadline_date?: string | null
+          filed_at?: string | null
+          generation_decision?: 'adapted' | 'rebuilt' | null
+          generation_reason?: string | null
+          generation_started_at?: string | null
+          created_at?: string
+        }
+      }
+      stage_artifacts: {
+        Relationships: []
+        Row: {
+          id: string
+          stage_id: string
+          artifact_type: 'grievance_letter' | 'complaint_form' | 'statement_of_case' | 'filing_walkthrough' | 'cc_list' | 'evidence_checklist'
+          storage_path: string
+          generated_at: string
+        }
+        Insert: {
+          id?: string
+          stage_id: string
+          artifact_type: 'grievance_letter' | 'complaint_form' | 'statement_of_case' | 'filing_walkthrough' | 'cc_list' | 'evidence_checklist'
+          storage_path: string
+          generated_at?: string
+        }
+        Update: {
+          id?: string
+          stage_id?: string
+          artifact_type?: 'grievance_letter' | 'complaint_form' | 'statement_of_case' | 'filing_walkthrough' | 'cc_list' | 'evidence_checklist'
+          storage_path?: string
+          generated_at?: string
         }
       }
       kb_chunks: {
@@ -236,13 +302,6 @@ export function createClient() {
         },
       },
     }
-  )
-}
-
-export function createBrowserClient() {
-  return createSupabaseBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 }
 

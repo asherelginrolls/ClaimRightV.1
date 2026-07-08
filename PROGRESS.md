@@ -23,6 +23,14 @@ top-up: `npm run test:smoke` (local) must go green, then re-verify on Vercel.
 Supabase dashboard fixes (Site URL, {{ .Token }} templates, Resend SMTP) are Asher's —
 see the PR description / session summary. Phase-6 test data cleaned (user deleted;
 case ad556e34 was already gone).
+⚠️ CODE REVIEW NOT DONE: /code-review finder agents (angles A+B diff scan /
+removed-behavior, C cross-file tracer, cleanup+conventions) were launched but the
+session limit killed them before any findings returned. The next session MUST re-run
+/code-review on this branch's diff (main...HEAD) and fix findings before merge.
+Known review-worthy spots: download route's `'generation_started_at' in caseRow`
+column-detection, stages-route lock-claim type casts, OtpSignIn resend calling
+sendCode() (re-validates email — fine, but double-check cooldown interplay),
+smoke-script storage cleanup missing nested stages/ folders.
 
 Plan: the Ashray one-shot build PRD (Phases 0–8). Each phase ends with tsc clean +
 commit + an update here. FEATURES.md is the definition of done.

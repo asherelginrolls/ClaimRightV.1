@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "tsc --noEmit && tsx scripts/test-generation.ts",
+    "test:golden": "tsx --env-file=.env.local scripts/eval/run-golden.ts",
+    "test:smoke": "tsx --env-file=.env.local scripts/e2e-smoke.ts",
+    "test:smoke:stages": "tsx --env-file=.env.local scripts/e2e-smoke.ts --stages"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",

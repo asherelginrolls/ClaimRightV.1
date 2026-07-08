@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import { OtpSignIn } from '@/app/components/OtpSignIn'
 
 interface DownloadReadyResponse {
   pending: false
@@ -63,6 +64,7 @@ export default function DownloadPage() {
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
   const [takingLong, setTakingLong] = useState(false)
+  const [needsSignIn, setNeedsSignIn] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pollCountRef = useRef(0)
 
@@ -90,8 +92,14 @@ export default function DownloadPage() {
       try {
         const res = await fetch(`/api/download/${caseId}`)
         if (!res.ok) {
-          const d = (await res.json()) as { error?: string }
-          setError(d.error ?? "We couldn't load your letter. Please try again.")
+          const d = (await res.json()) as { error?: string; code?: string }
+          if (res.status === 403 && d.code === 'sign_in_required') {
+            // Opened from an email link on a new device — sign in with the
+            // case email, claim, and resume.
+            setNeedsSignIn(true)
+          } else {
+            setError(d.error ?? "We couldn't load your letter. Please try again.")
+          }
           clearInterval(intervalRef.current!)
           return
         }
@@ -112,6 +120,32 @@ export default function DownloadPage() {
     intervalRef.current = setInterval(poll, 3000)
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
   }, [caseId, attempt])
+
+  if (needsSignIn) {
+    return (
+      <main className="min-h-[calc(100vh-8rem)] bg-mist px-6 py-14">
+        <div className="mx-auto max-w-md py-10">
+          <div className="mb-6 text-center">
+            <p className="font-display text-2xl font-semibold text-ink-deep">
+              Sign in to open your letter
+            </p>
+            <p className="mt-2 font-sans text-sm leading-relaxed text-slate">
+              Use the email address this case was created with, and we&apos;ll link it to your
+              account and open your letter.
+            </p>
+          </div>
+          <OtpSignIn
+            onSignedIn={() => {
+              void fetch(`/api/cases/${caseId}/claim`, { method: 'POST' }).finally(() => {
+                setNeedsSignIn(false)
+                setAttempt((a) => a + 1)
+              })
+            }}
+          />
+        </div>
+      </main>
+    )
+  }
 
   if (error) {
     return (

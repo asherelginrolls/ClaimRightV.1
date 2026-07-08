@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient, type Database } from '@/lib/supabase'
 import { generateAndDeliver } from '@/lib/deliver'
+import { getAuthenticatedUser, canAccessCase } from '@/lib/auth'
 import type { ApiError } from '@/types/api'
 import { rateLimit } from '@/lib/rate-limit'
 
@@ -80,7 +81,7 @@ async function releaseGeneration(supabase: SupabaseClient, caseId: string): Prom
   }
 }
 
-type CaseStateRow = Pick<CaseRow, 'id' | 'status' | 'letter_path'> & {
+type CaseStateRow = Pick<CaseRow, 'id' | 'status' | 'letter_path' | 'user_id'> & {
   generation_started_at?: string | null
 }
 
@@ -91,14 +92,14 @@ async function fetchCaseState(
 ): Promise<CaseStateRow | null> {
   const { data, error } = await supabase
     .from('cases')
-    .select('id, status, letter_path, generation_started_at')
+    .select('id, status, letter_path, user_id, generation_started_at')
     .eq('id', caseId)
     .single()
   if (!error && data) return data as CaseStateRow
   if (error && /generation_started_at/.test(error.message)) {
     const { data: fallback } = await supabase
       .from('cases')
-      .select('id, status, letter_path')
+      .select('id, status, letter_path, user_id')
       .eq('id', caseId)
       .single()
     return (fallback as CaseStateRow | null) ?? null
@@ -164,6 +165,23 @@ export async function GET(
   const caseRow = await fetchCaseState(supabase, caseId)
   if (!caseRow) {
     return NextResponse.json({ error: 'Case not found' }, { status: 404 })
+  }
+
+  // Access: the uploading browser (cr_sid cookie) for anonymous cases, the
+  // owner for claimed cases. Anyone else — e.g. an email link opened on a new
+  // device — gets a 403 the page turns into a sign-in-and-claim prompt.
+  const user = await getAuthenticatedUser()
+  if (
+    !canAccessCase(
+      { id: caseRow.id, user_id: caseRow.user_id },
+      user?.id ?? null,
+      request.cookies.get('cr_sid')?.value
+    )
+  ) {
+    return NextResponse.json(
+      { error: 'Sign in to open this case.', code: 'sign_in_required' },
+      { status: 403 }
+    )
   }
 
   // ── Stale-claim recovery: a 'generating' case whose claim is older than

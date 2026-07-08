@@ -715,9 +715,17 @@ export async function GET(
       point_by_point_analysis: pointByPointAnalysis,
     }
 
-    console.info('[analyse] stage: db-write-start')
-    await typedUpdate(supabase, updatePayload).eq('id', caseId)
-    console.info('[analyse] stage: db-write-end')
+    if (reasoning.groundingFailed) {
+      // Retrieval infra errored (embed rate limit / DB outage): the angles have
+      // EMPTY groundings, so this result has no citations — a degraded verdict.
+      // Serve it for this request but do NOT cache it as final: the case stays
+      // 'uploaded' and the next refresh re-runs with working retrieval.
+      console.warn('[analyse] grounding failed — serving uncached degraded result')
+    } else {
+      console.info('[analyse] stage: db-write-start')
+      await typedUpdate(supabase, updatePayload).eq('id', caseId)
+      console.info('[analyse] stage: db-write-end')
+    }
 
     const regulationMatchCount = evidenceSummaries.filter((e) => e.tier === 1).length
     const precedentMatchCount = evidenceSummaries.filter((e) => e.tier === 2).length

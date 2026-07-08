@@ -78,6 +78,10 @@ export interface ReasoningResult {
   merged: RetrievalResult
   /** True when strategize failed and we fell back to single-query retrieval. */
   usedFallback: boolean
+  /** True when retrieval itself errored (embed/DB outage or rate limit) — the
+   *  angles were classified with EMPTY groundings, so the result must not be
+   *  cached as a final verdict. Distinct from "the KB genuinely has nothing". */
+  groundingFailed: boolean
 }
 
 /** Pluggable retriever: one RetrievalResult per query, same order. The default
@@ -231,10 +235,11 @@ export async function runReasoning(
       policyAgeMonths: input.policyAgeMonths ?? null,
       primaryDiagnosis: input.primaryDiagnosis ?? null,
     })
-    return { angles: [], dropped: [], merged, usedFallback: true }
+    return { angles: [], dropped: [], merged, usedFallback: true, groundingFailed: false }
   }
 
   let groundings: RetrievalResult[]
+  let groundingFailed = false
   try {
     groundings = await retriever(strategized.angles.map((a) => a.searchQuery))
   } catch (err) {
@@ -244,12 +249,13 @@ export async function runReasoning(
     )
     const empty: RetrievalResult = { chunks: [], queryEmbedding: [], topScore: 0 }
     groundings = strategized.angles.map(() => empty)
+    groundingFailed = true
   }
 
   const angles = strategized.angles.map((a, i) => classify(a, groundings[i]))
   const merged = mergeRetrievals(groundings)
 
-  return { angles, dropped: strategized.dropped, merged, usedFallback: false }
+  return { angles, dropped: strategized.dropped, merged, usedFallback: false, groundingFailed }
 }
 
 // ── Eval entry point (scripts/eval/run-golden.ts pipeline mode) ─────────────

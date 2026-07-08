@@ -155,8 +155,10 @@ async function main(): Promise<void> {
   const pdfMagic = Array.from(pdfBytes.slice(0, 5))
     .map((b) => String.fromCharCode(b))
     .join('')
+  // ≥400-word letters render ~4-7KB with pdf-lib (Phase 6's verified GRO
+  // letter was 5KB) — 3KB catches truncation without failing legitimate letters.
   assert(
-    pdfRes.ok && pdfBytes.length > 10_000 && pdfMagic === '%PDF-',
+    pdfRes.ok && pdfBytes.length > 3_000 && pdfMagic === '%PDF-',
     `letter is a real PDF (${(pdfBytes.length / 1024).toFixed(0)} KB)`
   )
 

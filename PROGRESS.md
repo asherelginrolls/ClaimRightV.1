@@ -1,5 +1,41 @@
 # PROGRESS.md — Build log (resume from here)
 
+## 2026-07-08 (later) — Code review + hardening + research round (PR #19 branch)
+- **/code-review (medium) on the PR #19 diff — 5 findings, all fixed** (d3cbdce):
+  1. analyse client abort 180s < server 300s → Retry could double-run the paid
+     pipeline → client now aborts at 310s.
+  2. Pre-migration-014 stuck 'generating' cases had no recovery → download page
+     sends `?stuck=1` on retry after a ~7-min stall; server honours it ONLY in
+     the missing-column fallback (post-014 semantics unchanged).
+  3. OtpSignIn throttle detection missed Supabase's real "For security
+     purposes… after N seconds" wording → matcher broadened; throttled users
+     advance to the code step with a cooldown.
+  4. e2e-smoke storage cleanup orphaned nested stages/ artifacts → shared
+     recursive `scripts/lib/storage-cleanup.ts`, reused by the phase6 cleanup.
+  5. Download page: a stall error could hide a letter that finished afterwards
+     → signedUrl now wins over error.
+- **PR triage:** #17 closed (superseded — analyse route already parallelises OCR,
+  batches extraction, folds point-by-point into the fast path). #16 closed
+  (conflicting across rewritten lib/; migration 008 numbering collision; coverage
+  now via test-generation 30/30 + golden eval + e2e-smoke). Worth re-porting
+  fresh later: #16's unit tests for scoring/span-validation/synonyms/rate-limit.
+- **Research round (fighthealthinsurance.com, healthinsurance-llm, OSS scan):**
+  - TOOK: their production "confirm the extraction with the user" step →
+    "What we read from your letter" strip on the analysis page (insurer/claim/
+    rejection ground, plain-English labels, honest re-upload copy). UI-only.
+  - REJECTED: fine-tuned model on back-converted appeal decisions (= the
+    synthetic-precedent class Ashray quarantined in Phase 1); chat interface
+    (out of scope); fax/email auto-submission (assisted filing only, §4).
+    Their README admits no letter validation — Ashray's span-validation is ahead.
+- **Design-thinking funnel pass:** worst dishonest state fixed — an unreadable
+  scan no longer persists a fake "low fightability (5)" verdict; it returns an
+  honest 400 ("says nothing about how strong your case is") + re-upload
+  guidance (9068c44). Upload/vault states audited — already honest.
+- **RAG verified real** against live KB: 6/6 benchmark queries hit before Voyage
+  free-tier 429 (3 RPM) stopped the run — incl. both Excl.02 gap queries
+  (hit@1 @0.705/@0.724). Full 12-query re-run pending (needs serial run, no
+  concurrent embeds). Anthropic credits verified live.
+
 ## RESUME POINT (2026-07-08) — Fix-and-polish round (branch claude/gallant-engelbart-85d48f)
 Root causes of "the funnel always gets stuck" found and fixed:
 1. **vercel.json capped /api/analyse at 60s** while the pipeline needs ~85–120s → killed

@@ -84,8 +84,24 @@ export async function generateAndDeliver(
 
   const emailRow = rawCaseRow as Pick<CaseRow, 'email'> | null
 
+  // Email is strictly non-fatal: the letter is already uploaded and the case is
+  // 'generated'. A hung or failing email provider must never throw — that used
+  // to bubble up to the download route, reset the case to 'paid', and re-run
+  // the entire (paid) letter pipeline on the next poll.
   if (emailRow?.email && urlData?.signedUrl) {
-    await sendDisputeLetterEmail(emailRow.email, caseId, urlData.signedUrl)
-    await typedUpdate(supabase, { status: 'delivered' }).eq('id', caseId)
+    try {
+      await Promise.race([
+        sendDisputeLetterEmail(emailRow.email, caseId, urlData.signedUrl),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('email send timed out after 10s')), 10_000)
+        ),
+      ])
+      await typedUpdate(supabase, { status: 'delivered' }).eq('id', caseId)
+    } catch (err) {
+      console.warn(
+        '[deliver] email send failed (non-fatal, letter already generated):',
+        err instanceof Error ? err.message : String(err)
+      )
+    }
   }
 }

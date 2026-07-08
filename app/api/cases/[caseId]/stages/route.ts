@@ -11,7 +11,7 @@ import { generateStageArtifacts } from '@/lib/artifacts'
 import { computeDeadline, type DisputeStage } from '@/lib/deadlines'
 import type { ApiError } from '@/types/api'
 
-export const maxDuration = 120
+export const maxDuration = 300
 
 type CaseRow = Database['public']['Tables']['cases']['Row']
 type StageRow = Database['public']['Tables']['dispute_stages']['Row']
@@ -42,8 +42,12 @@ export interface StageWithArtifacts {
   artifacts: Array<{ id: string; type: ArtifactRow['artifact_type']; generatedAt: string }>
 }
 
-// A generation lock older than this is considered dead (crashed run) and retried.
-const LOCK_STALE_MS = 3 * 60_000
+// A generation lock older than this is considered dead and retried. Generation
+// runs inside this request, whose lifetime is capped by maxDuration (300s) — so
+// any lock older than that belongs to a killed function, never an active run.
+// Thrown errors clear the lock immediately (finally below); this only covers
+// hard kills.
+const LOCK_STALE_MS = 330_000
 
 export async function GET(
   request: NextRequest,
@@ -84,23 +88,38 @@ export async function GET(
         Date.now() - new Date(s.generation_started_at).getTime() > LOCK_STALE_MS)
   )
   if (pending && caseRow.paid_at) {
-    // Claim the lock; only proceed if we actually flipped it (best-effort
-    // versus concurrent polls — the eq on the old value narrows the race).
-    const { error: lockError } = await updateStage(supabase, {
-      generation_started_at: new Date().toISOString(),
-    }).eq('id', pending.id)
+    // Claim the lock atomically: the WHERE clause matches the exact lock value
+    // we read (null or the stale timestamp), so of two concurrent polls only
+    // one can flip it — the loser updates zero rows and just waits.
+    const claimQuery = (
+      supabase.from('dispute_stages').update as unknown as (v: StageUpdate) => {
+        eq: (c: string, v: string) => {
+          is: (c: string, v: null) => { select: (cols: string) => Promise<{ data: Array<{ id: string }> | null; error: unknown }> }
+          eq: (c: string, v: string) => { select: (cols: string) => Promise<{ data: Array<{ id: string }> | null; error: unknown }> }
+        }
+      }
+    )({ generation_started_at: new Date().toISOString() }).eq('id', pending.id)
+    const { data: claimedRows, error: lockError } = pending.generation_started_at
+      ? await claimQuery.eq('generation_started_at', pending.generation_started_at).select('id')
+      : await claimQuery.is('generation_started_at', null).select('id')
 
-    if (!lockError) {
+    if (!lockError && (claimedRows?.length ?? 0) > 0) {
+      let generated = false
       try {
         console.info(`[stages] generating ${pending.stage} artifacts for case ${params.caseId}`)
         await generateStageArtifacts(params.caseId, pending.stage as DisputeStage)
+        generated = true
       } catch (err) {
         console.error(
           `[stages] generation failed for ${pending.stage}:`,
           err instanceof Error ? err.message : String(err)
         )
-        // Clear the lock so the next poll retries.
-        await updateStage(supabase, { generation_started_at: null }).eq('id', pending.id)
+      } finally {
+        if (!generated) {
+          // Clear the lock so the next poll retries immediately instead of
+          // waiting out LOCK_STALE_MS.
+          await updateStage(supabase, { generation_started_at: null }).eq('id', pending.id)
+        }
       }
       const { data: refreshed } = await supabase
         .from('dispute_stages')

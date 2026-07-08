@@ -36,7 +36,7 @@ const NEXT_STEPS = [
   },
 ]
 
-function Generating() {
+function Generating({ takingLong }: { takingLong: boolean }) {
   return (
     <div className="mx-auto flex min-h-[55vh] max-w-md flex-col items-center justify-center gap-6 text-center">
       <div className="h-12 w-12 animate-sunpulse rounded-full bg-sun shadow-glow" />
@@ -45,7 +45,11 @@ function Generating() {
         <p className="mt-2 font-mono text-xs tracking-wide text-slate">
           Verifying every citation · Checking the rules · Building your PDF
         </p>
-        <p className="mt-1 font-mono text-[10px] text-slate-faint">This usually takes 30–60 seconds</p>
+        <p className="mt-1 font-mono text-[10px] text-slate-faint">
+          {takingLong
+            ? 'Taking a little longer than usual — still working, no action needed'
+            : 'This usually takes about two minutes — every legal point is checked against the real rules'}
+        </p>
       </div>
     </div>
   )
@@ -57,12 +61,32 @@ export default function DownloadPage() {
 
   const [signedUrl, setSignedUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
+  const [takingLong, setTakingLong] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollCountRef = useRef(0)
+
+  // Polls every 3s. After ~2.5 min switch to "taking longer" copy; after
+  // ~7 min (well past the server's 5-min stale-claim auto-retry) stop and
+  // surface a retry instead of spinning forever.
+  const LONG_AFTER_POLLS = 50
+  const STALLED_AFTER_POLLS = 140
 
   useEffect(() => {
     if (!caseId) return
+    pollCountRef.current = 0
+    setTakingLong(false)
 
     async function poll() {
+      pollCountRef.current += 1
+      if (pollCountRef.current === LONG_AFTER_POLLS) setTakingLong(true)
+      if (pollCountRef.current >= STALLED_AFTER_POLLS) {
+        setError(
+          "Generation is taking far longer than it should. Your payment and case are safe — retry below, and the letter will pick up where it left off."
+        )
+        clearInterval(intervalRef.current!)
+        return
+      }
       try {
         const res = await fetch(`/api/download/${caseId}`)
         if (!res.ok) {
@@ -87,7 +111,7 @@ export default function DownloadPage() {
     poll()
     intervalRef.current = setInterval(poll, 3000)
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
-  }, [caseId])
+  }, [caseId, attempt])
 
   if (error) {
     return (
@@ -97,10 +121,13 @@ export default function DownloadPage() {
             <p className="font-display text-xl font-semibold text-ink-deep">Something went wrong</p>
             <p className="mt-2 font-sans text-sm text-slate">{error}</p>
             <button
-              onClick={() => window.location.reload()}
-              className="mt-6 inline-flex items-center gap-1 rounded-full border border-rule-strong bg-paper px-5 py-2.5 font-sans text-sm font-medium text-blue-deep transition-colors hover:border-blue/40"
+              onClick={() => {
+                setError(null)
+                setAttempt((a) => a + 1)
+              }}
+              className="mt-6 inline-flex items-center gap-1 rounded-full bg-blue px-6 py-2.5 font-sans text-sm font-semibold text-white shadow-lift transition-colors hover:bg-blue-deep"
             >
-              Refresh page
+              Retry
             </button>
           </div>
         </div>
@@ -111,7 +138,7 @@ export default function DownloadPage() {
   if (!signedUrl) {
     return (
       <main className="min-h-[calc(100vh-8rem)] bg-mist px-6 py-14">
-        <Generating />
+        <Generating takingLong={takingLong} />
       </main>
     )
   }

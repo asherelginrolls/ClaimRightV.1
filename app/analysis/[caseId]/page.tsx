@@ -155,18 +155,29 @@ function LoadingState() {
   )
 }
 
-function ErrorState({ message }: { message: string }) {
+function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <div className="mx-auto max-w-md py-20 text-center">
       <div className="rounded-2xl border border-rule bg-paper px-6 py-8 shadow-lift">
         <p className="font-display text-xl font-semibold text-ink-deep">We hit a snag</p>
         <p className="mt-2 font-sans text-sm text-slate">{message}</p>
-        <Link
-          href="/upload"
-          className="mt-6 inline-flex items-center gap-1 rounded-full border border-rule-strong bg-paper px-5 py-2.5 font-sans text-sm font-medium text-blue-deep transition-colors hover:border-blue/40"
+        <p className="mt-1 font-sans text-xs text-slate-faint">
+          Your documents are safe — nothing is lost. Retrying picks up where we left off.
+        </p>
+        <button
+          onClick={onRetry}
+          className="mt-6 inline-flex items-center gap-2 rounded-full bg-blue px-6 py-2.5 font-sans text-sm font-semibold text-white shadow-lift transition-colors hover:bg-blue-deep"
         >
-          ← Try again
-        </Link>
+          Retry the analysis
+        </button>
+        <div className="mt-3">
+          <Link
+            href="/upload"
+            className="font-mono text-xs text-slate-muted transition-colors hover:text-ink"
+          >
+            ← or start over with a new upload
+          </Link>
+        </div>
       </div>
     </div>
   )
@@ -179,10 +190,13 @@ export default function AnalysisPage() {
   const [result, setResult] = useState<AnalyseResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 120_000)
+    // The server budget is 300s; already-analysed cases return instantly from
+    // cache, so a long first-run wait is the only case this timeout guards.
+    const timeout = setTimeout(() => controller.abort(), 180_000)
 
     async function fetchAnalysis() {
       try {
@@ -195,7 +209,7 @@ export default function AnalysisPage() {
         }
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') {
-          setError('This is taking longer than expected. Refresh the page to try again.')
+          setError("This is taking longer than expected — usually a busy moment, not a lost case.")
         } else {
           setError("We couldn't reach the server. Please check your connection.")
         }
@@ -210,12 +224,18 @@ export default function AnalysisPage() {
       clearTimeout(timeout)
       controller.abort()
     }
-  }, [caseId])
+  }, [caseId, attempt])
+
+  const retry = () => {
+    setError(null)
+    setLoading(true)
+    setAttempt((a) => a + 1)
+  }
 
   return (
     <main className="min-h-[calc(100vh-8rem)] bg-mist px-6 py-14">
       {loading && <LoadingState />}
-      {!loading && error && <ErrorState message={error} />}
+      {!loading && error && <ErrorState message={error} onRetry={retry} />}
       {!loading && result && <ResultView result={result} caseId={caseId} />}
     </main>
   )

@@ -4,7 +4,14 @@ import { generateAndDeliver } from '@/lib/deliver'
 import type { ApiError } from '@/types/api'
 import { rateLimit } from '@/lib/rate-limit'
 
-export const maxDuration = 120
+// The letter pipeline (strategize ≤60s + grounding ≤25s + letter Sonnet ≤120s +
+// PDF/upload) can approach 205s. 120s used to kill the function mid-generation,
+// stranding the case at status='generating' with no recovery.
+export const maxDuration = 300
+
+// A 'generating' claim older than this is considered dead (the serverless
+// function that held it was killed) and is reset to 'paid' so generation retries.
+const GENERATION_STALE_MS = 5 * 60_000
 
 type CaseRow = Database['public']['Tables']['cases']['Row']
 type CaseUpdate = Database['public']['Tables']['cases']['Update']
@@ -17,6 +24,88 @@ function typedUpdate(supabase: SupabaseClient, values: CaseUpdate): UpdateQuery 
   return (supabase.from('cases').update as unknown as (v: CaseUpdate) => UpdateQuery)(values)
 }
 
+type ConditionalUpdateResult = {
+  data: Array<{ id: string }> | null
+  error: { message: string } | null
+}
+type ConditionalUpdateQuery = {
+  eq: (column: string, value: string) => ConditionalUpdateQuery
+  select: (columns: string) => Promise<ConditionalUpdateResult>
+}
+function conditionalUpdate(supabase: SupabaseClient, values: CaseUpdate): ConditionalUpdateQuery {
+  return (supabase.from('cases').update as unknown as (v: CaseUpdate) => ConditionalUpdateQuery)(
+    values
+  )
+}
+
+function isMissingColumnError(error: { message: string } | null): boolean {
+  return error !== null && /generation_started_at/.test(error.message)
+}
+
+/**
+ * Atomically claim generation: paid → generating. Returns true only if THIS
+ * request won the claim (a row was actually updated). Falls back to a claim
+ * without the timestamp until migration 014 is applied.
+ */
+async function claimGeneration(supabase: SupabaseClient, caseId: string): Promise<boolean> {
+  const withTimestamp: CaseUpdate = {
+    status: 'generating',
+    generation_started_at: new Date().toISOString(),
+  }
+  let result = await conditionalUpdate(supabase, withTimestamp)
+    .eq('id', caseId)
+    .eq('status', 'paid')
+    .select('id')
+  if (isMissingColumnError(result.error)) {
+    result = await conditionalUpdate(supabase, { status: 'generating' })
+      .eq('id', caseId)
+      .eq('status', 'paid')
+      .select('id')
+  }
+  return result.error === null && (result.data?.length ?? 0) > 0
+}
+
+/** Reset a dead 'generating' claim back to 'paid' so the next poll retries. */
+async function releaseGeneration(supabase: SupabaseClient, caseId: string): Promise<void> {
+  const values: CaseUpdate = { status: 'paid', generation_started_at: null }
+  const result = await conditionalUpdate(supabase, values)
+    .eq('id', caseId)
+    .eq('status', 'generating')
+    .select('id')
+  if (isMissingColumnError(result.error)) {
+    await conditionalUpdate(supabase, { status: 'paid' })
+      .eq('id', caseId)
+      .eq('status', 'generating')
+      .select('id')
+  }
+}
+
+type CaseStateRow = Pick<CaseRow, 'id' | 'status' | 'letter_path'> & {
+  generation_started_at?: string | null
+}
+
+/** Fetch case state; tolerates the generation_started_at column not existing yet. */
+async function fetchCaseState(
+  supabase: SupabaseClient,
+  caseId: string
+): Promise<CaseStateRow | null> {
+  const { data, error } = await supabase
+    .from('cases')
+    .select('id, status, letter_path, generation_started_at')
+    .eq('id', caseId)
+    .single()
+  if (!error && data) return data as CaseStateRow
+  if (error && /generation_started_at/.test(error.message)) {
+    const { data: fallback } = await supabase
+      .from('cases')
+      .select('id, status, letter_path')
+      .eq('id', caseId)
+      .single()
+    return (fallback as CaseStateRow | null) ?? null
+  }
+  return null
+}
+
 interface DownloadReadyResponse {
   pending: false
   signedUrl: string
@@ -27,6 +116,30 @@ interface DownloadReadyResponse {
 interface DownloadPendingResponse {
   pending: true
   status: CaseRow['status']
+}
+
+async function signedUrlResponse(
+  supabase: SupabaseClient,
+  caseRow: Pick<CaseRow, 'id' | 'status'>,
+  letterPath: string
+): Promise<NextResponse<DownloadReadyResponse | ApiError>> {
+  const { data: urlData, error: urlError } = await supabase.storage
+    .from('documents')
+    .createSignedUrl(letterPath, 60 * 60) // 1-hour expiry
+
+  if (urlError || !urlData?.signedUrl) {
+    return NextResponse.json(
+      { error: 'Could not generate download link. Please try again.' },
+      { status: 500 }
+    )
+  }
+
+  return NextResponse.json({
+    pending: false,
+    signedUrl: urlData.signedUrl,
+    caseId: caseRow.id,
+    status: caseRow.status,
+  })
 }
 
 export async function GET(
@@ -48,23 +161,45 @@ export async function GET(
 
   const supabase = createServiceClient()
 
-  const { data: rawCase, error: caseError } = await supabase
-    .from('cases')
-    .select('id, status, letter_path')
-    .eq('id', caseId)
-    .single()
-
-  if (caseError || !rawCase) {
+  const caseRow = await fetchCaseState(supabase, caseId)
+  if (!caseRow) {
     return NextResponse.json({ error: 'Case not found' }, { status: 404 })
   }
 
-  const caseRow = rawCase as Pick<CaseRow, 'id' | 'status' | 'letter_path'>
+  // ── Stale-claim recovery: a 'generating' case whose claim is older than
+  //    GENERATION_STALE_MS (or predates migration 014's timestamp) belongs to a
+  //    function Vercel already killed. Reset it so generation retries instead of
+  //    leaving the user on a spinner forever.
+  if (caseRow.status === 'generating') {
+    const startedAt = caseRow.generation_started_at
+      ? new Date(caseRow.generation_started_at).getTime()
+      : null
+    const isStale = startedAt === null || Date.now() - startedAt > GENERATION_STALE_MS
+    // If the letter already exists, the previous run died between upload and
+    // status update — just serve it.
+    if (caseRow.letter_path) {
+      await typedUpdate(supabase, { status: 'generated' }).eq('id', caseId)
+      return signedUrlResponse(supabase, { id: caseRow.id, status: 'generated' }, caseRow.letter_path)
+    }
+    if (!isStale || !('generation_started_at' in caseRow)) {
+      // Either an active run, or (pre-migration-014) we can't tell — wait.
+      return NextResponse.json({ pending: true, status: 'generating' })
+    }
+    console.warn('[download] stale generating claim reset caseId=' + caseId)
+    await releaseGeneration(supabase, caseId)
+    caseRow.status = 'paid'
+  }
 
   // ── Lazy generation: triggered here rather than fire-and-forget in
   //    payment/verify, so it runs within a real serverless function lifecycle.
   if (caseRow.status === 'paid') {
-    // Atomically claim generation to prevent duplicate runs across concurrent polls.
-    await typedUpdate(supabase, { status: 'generating' }).eq('id', caseId)
+    // Atomically claim generation (paid → generating, WHERE status='paid') so
+    // concurrent polls can never run the pipeline twice.
+    const claimed = await claimGeneration(supabase, caseId)
+    if (!claimed) {
+      // Another poll holds the claim — just wait.
+      return NextResponse.json({ pending: true, status: 'generating' })
+    }
     console.info('[download] stage: generation-start caseId=' + caseId)
     try {
       await generateAndDeliver(caseId, supabase)
@@ -77,49 +212,19 @@ export async function GET(
         err instanceof Error ? err.message : String(err),
       )
       // Reset to 'paid' so the next poll retries generation.
-      await typedUpdate(supabase, { status: 'paid' }).eq('id', caseId)
+      await releaseGeneration(supabase, caseId)
       return NextResponse.json({ pending: true, status: 'paid' })
     }
 
     // Re-fetch after generation to get the updated letter_path
-    const { data: refreshed } = await supabase
-      .from('cases')
-      .select('id, status, letter_path')
-      .eq('id', caseId)
-      .single()
-
+    const refreshed = await fetchCaseState(supabase, caseId)
     if (!refreshed) {
       return NextResponse.json({ error: 'Case not found after generation' }, { status: 404 })
     }
-
-    const refreshedRow = refreshed as Pick<CaseRow, 'id' | 'status' | 'letter_path'>
-
-    if (!refreshedRow.letter_path) {
-      return NextResponse.json({ pending: true, status: refreshedRow.status })
+    if (!refreshed.letter_path) {
+      return NextResponse.json({ pending: true, status: refreshed.status })
     }
-
-    const { data: urlData, error: urlError } = await supabase.storage
-      .from('documents')
-      .createSignedUrl(refreshedRow.letter_path, 60 * 60)
-
-    if (urlError || !urlData?.signedUrl) {
-      return NextResponse.json(
-        { error: 'Could not generate download link. Please try again.' },
-        { status: 500 },
-      )
-    }
-
-    return NextResponse.json({
-      pending: false,
-      signedUrl: urlData.signedUrl,
-      caseId: refreshedRow.id,
-      status: refreshedRow.status,
-    })
-  }
-
-  // Another poll already claimed generation — just wait
-  if (caseRow.status === 'generating') {
-    return NextResponse.json({ pending: true, status: 'generating' })
+    return signedUrlResponse(supabase, refreshed, refreshed.letter_path)
   }
 
   // Letter not yet ready for any other pre-generation status
@@ -127,18 +232,5 @@ export async function GET(
     return NextResponse.json({ pending: true, status: caseRow.status })
   }
 
-  const { data: urlData, error: urlError } = await supabase.storage
-    .from('documents')
-    .createSignedUrl(caseRow.letter_path, 60 * 60) // 1-hour expiry
-
-  if (urlError || !urlData?.signedUrl) {
-    return NextResponse.json({ error: 'Could not generate download link. Please try again.' }, { status: 500 })
-  }
-
-  return NextResponse.json({
-    pending: false,
-    signedUrl: urlData.signedUrl,
-    caseId: caseRow.id,
-    status: caseRow.status,
-  })
+  return signedUrlResponse(supabase, caseRow, caseRow.letter_path)
 }

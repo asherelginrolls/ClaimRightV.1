@@ -27,6 +27,12 @@ async function embedWithRetry(
       await new Promise((r) => setTimeout(r, 20_000))
       return embedWithRetry(input, inputType, 1)
     }
+    // Transient timeouts get one immediate retry too — a single slow round-trip
+    // must not fail a whole analysis run.
+    if (attempt === 0 && msg.includes('timeout')) {
+      console.warn('[voyage] Timeout — retrying once')
+      return embedWithRetry(input, inputType, 1)
+    }
     throw err
   }
 }

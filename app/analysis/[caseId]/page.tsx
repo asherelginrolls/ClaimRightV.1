@@ -306,6 +306,34 @@ function ResultView({ result, caseId }: { result: AnalyseResponse; caseId: strin
         </div>
       )}
 
+      {/* ── Why this score: each reason tagged with its source status ── */}
+      {(result.fightabilityReasons ?? []).length > 0 && (
+        <div className="mt-8">
+          <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.18em] text-slate-faint">
+            Why this score · where each point comes from
+          </p>
+          <div className="flex flex-col gap-3">
+            {(result.fightabilityReasons ?? []).slice(0, 3).map((r, i) => (
+              <div key={i} className="rounded-2xl border border-rule bg-paper px-5 py-4 shadow-lift">
+                <p className="font-sans text-sm leading-relaxed text-ink">{r.reason}</p>
+                {r.citation ? (
+                  <p className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-hope/10 px-2 py-1 font-mono text-[10px] tracking-wide text-hope">
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                    Verified — {r.citation}
+                  </p>
+                ) : (
+                  <p className="mt-2 inline-block rounded-md bg-slate-faint/15 px-2 py-1 font-mono text-[10px] tracking-wide text-slate">
+                    General principle — worth confirming with an advisor
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── Evidence cards ── */}
       {evidenceSummaries.length > 0 && (
         <div className="mt-8">

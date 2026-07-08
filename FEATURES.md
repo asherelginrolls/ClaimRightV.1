@@ -67,3 +67,17 @@ verification in Phase 6.
 - [x] Q2. docs/unit-economics.md: bottoms-up per-case cost from actual token counts at 1,000 cases/month — evidence: measured live (Haiku+Sonnet usage logged), core paid case ≈ ₹23 AI / ~90% margin at ₹299
 - [ ] Q3. README + CLAUDE.md reflect shipped reality
 - [ ] Q4. Live Vercel deploy verified (landing, upload, analysis)
+
+## Fix-and-polish round (2026-07-08, branch claude/gallant-engelbart)
+- [x] P1. Post-payment generation can never strand a case at 'generating' — atomic paid→generating claim, generation_started_at stamp (migration 014, graceful pre-migration fallback), stale claims (>5 min or letter-already-uploaded) auto-recover — evidence: download route rewrite; live logs show failed generation resetting to 'paid' and retrying on next poll
+- [x] P2. Timeout budgets match reality: analyse 300s, download 300s, generate 180s, stages 300s (vercel.json + route exports agree; previously vercel.json capped analyse at 60s and killed the ~85–120s pipeline mid-run)
+- [x] P3. Email delivery is 10s-capped and strictly non-fatal — a Resend failure no longer resets a paid case and re-runs the whole letter pipeline
+- [x] P4. Sarvam OCR actually works — the old v1/vision/ocr endpoint never existed (404, silently swallowed); replaced with the official Document Intelligence job flow — evidence: scripts/sarvam-live-test.ts → 2-page test letter OCR'd in 13.5s, 3,410 chars, tables preserved
+- [x] P5. OTP UX: 60s resend cooldown + resend button + distinct expired/mismatch copy; rate-limited sends advance to the code step instead of stranding the user
+- [x] P6. Early lead capture: "Keep this case safe" card on the analysis result (compact OTP, prefilled email, silent auto-claim when already signed in, dismissible)
+- [x] P7. Access model coherent: header shows Sign in / My cases by session; /api/download enforces canAccessCase (was: anyone with a case UUID could pull the letter); download page turns 403 into sign-in-and-claim so email links work on new devices
+- [x] P8. Client stuck-states removed: analysis page in-place retry (was: link to /upload, discarding the case); download page honest 2-min copy + taking-long state + ~7-min stall detection with retry
+- [x] P9. "Why this score" section tags each reason Verified (with source) vs general principle — surfacing the grounding the pipeline already computes
+- [x] P10. E2E smoke suite (scripts/e2e-smoke.ts) with per-step wall-clock timings + npm test chain — evidence: run on 2026-07-08 correctly caught the Anthropic-credit outage (score 5, no citation, no letter)
+- [ ] P11. Full live smoke green end-to-end — BLOCKED on Anthropic API credits (top up, then `npm run test:smoke`)
+- [x] P12. Phase-6 test data removed (case ad556e34… already absent; auth user phase6-vault@ashray.test deleted; stale smoke case cleaned)

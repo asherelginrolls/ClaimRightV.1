@@ -9,7 +9,10 @@ import Link from 'next/link'
 import { createBrowserClient } from '@/lib/supabase-browser'
 
 export function HeaderNav() {
-  const [signedIn, setSignedIn] = useState<boolean | null>(null)
+  // Default to the signed-out link: it server-renders (so the header works
+  // before/without hydration) and most visitors are signed out. The session
+  // check swaps it to "My cases" right after mount.
+  const [signedIn, setSignedIn] = useState(false)
 
   useEffect(() => {
     const supabase = createBrowserClient()
@@ -23,11 +26,6 @@ export function HeaderNav() {
     })
     return () => subscription.unsubscribe()
   }, [])
-
-  // Stable width while the session loads, so the header doesn't jump.
-  if (signedIn === null) {
-    return <span className="inline-block w-16" aria-hidden />
-  }
 
   return signedIn ? (
     <Link

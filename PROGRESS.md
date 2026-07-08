@@ -1,5 +1,29 @@
 # PROGRESS.md — Build log (resume from here)
 
+## RESUME POINT (2026-07-08) — Fix-and-polish round (branch claude/gallant-engelbart-85d48f)
+Root causes of "the funnel always gets stuck" found and fixed:
+1. **vercel.json capped /api/analyse at 60s** while the pipeline needs ~85–120s → killed
+   mid-run. Now 300s (download 300s, generate 180s, stages 300s; route exports agree).
+2. **Post-payment dead-end**: download-route generation (up to ~205s) inside a 120s
+   function → Vercel killed it after `status='generating'` was set, the catch never ran,
+   and every later poll returned pending forever. Fixed: atomic claim, migration 014
+   (`cases.generation_started_at` — **Asher must run in Studio**), stale-claim auto-reset,
+   serve-letter-if-already-uploaded, email 10s-capped + non-fatal.
+3. **Sarvam OCR never worked** — v1/vision/ocr is 404; every PDF silently used Haiku.
+   Replaced with the official job-based Document Intelligence flow (sarvamai SDK), 90s
+   budget, Haiku fallback kept, failures logged. Verified live: 13.5s for the test letter.
+4. OTP UX (cooldown/resend/copy), early lead capture on the analysis page, auth-aware
+   header, /api/download now ownership-checked (was open to anyone with the UUID),
+   in-place retries on analysis/download pages, "Why this score" verified-source tags.
+5. New: scripts/e2e-smoke.ts (npm run test:smoke / test:smoke:stages) with per-step
+   timings; npm run test = tsc + 30 offline generation checks.
+⚠️ BLOCKED on live verification: **the Anthropic API key is out of credits** ("credit
+balance is too low") — smoke run proved OCR-fallback + letter generation fail. After
+top-up: `npm run test:smoke` (local) must go green, then re-verify on Vercel.
+Supabase dashboard fixes (Site URL, {{ .Token }} templates, Resend SMTP) are Asher's —
+see the PR description / session summary. Phase-6 test data cleaned (user deleted;
+case ad556e34 was already gone).
+
 Plan: the Ashray one-shot build PRD (Phases 0–8). Each phase ends with tsc clean +
 commit + an update here. FEATURES.md is the definition of done.
 

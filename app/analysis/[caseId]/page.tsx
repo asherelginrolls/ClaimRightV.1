@@ -4,9 +4,26 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import type { AnalyseResponse } from '@/types/api'
+import { SaveCaseCard } from '@/app/components/SaveCaseCard'
 
 function formatRupees(amount: number): string {
   return `₹${amount.toLocaleString('en-IN')}`
+}
+
+// Plain-English labels for the 9 canonical rejection categories.
+function categoryLabel(category: string | null): string {
+  switch (category) {
+    case 'pre_existing_condition': return 'Pre-existing condition'
+    case 'policy_exclusion': return 'Policy exclusion'
+    case 'documentation_incomplete': return 'Incomplete documentation'
+    case 'non_disclosure': return 'Non-disclosure'
+    case 'waiting_period': return 'Waiting period'
+    case 'cashless_denial': return 'Cashless denial'
+    case 'experimental_treatment': return 'Experimental treatment'
+    case 'fraud_suspected': return 'Fraud allegation'
+    case 'other': return 'Other / unclear'
+    default: return 'Not identified'
+  }
 }
 
 // ── Hopeful score bands ──────────────────────────────────────────────────────
@@ -155,18 +172,29 @@ function LoadingState() {
   )
 }
 
-function ErrorState({ message }: { message: string }) {
+function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <div className="mx-auto max-w-md py-20 text-center">
       <div className="rounded-2xl border border-rule bg-paper px-6 py-8 shadow-lift">
         <p className="font-display text-xl font-semibold text-ink-deep">We hit a snag</p>
         <p className="mt-2 font-sans text-sm text-slate">{message}</p>
-        <Link
-          href="/upload"
-          className="mt-6 inline-flex items-center gap-1 rounded-full border border-rule-strong bg-paper px-5 py-2.5 font-sans text-sm font-medium text-blue-deep transition-colors hover:border-blue/40"
+        <p className="mt-1 font-sans text-xs text-slate-faint">
+          Your documents are safe — nothing is lost. Retrying picks up where we left off.
+        </p>
+        <button
+          onClick={onRetry}
+          className="mt-6 inline-flex items-center gap-2 rounded-full bg-blue px-6 py-2.5 font-sans text-sm font-semibold text-white shadow-lift transition-colors hover:bg-blue-deep"
         >
-          ← Try again
-        </Link>
+          Retry the analysis
+        </button>
+        <div className="mt-3">
+          <Link
+            href="/upload"
+            className="font-mono text-xs text-slate-muted transition-colors hover:text-ink"
+          >
+            ← or start over with a new upload
+          </Link>
+        </div>
       </div>
     </div>
   )
@@ -179,10 +207,14 @@ export default function AnalysisPage() {
   const [result, setResult] = useState<AnalyseResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 120_000)
+    // Abort only AFTER the server's 300s budget: aborting earlier lets the
+    // user hit Retry while the first run is still alive server-side, which
+    // would start a second full (paid) reasoning pipeline in parallel.
+    const timeout = setTimeout(() => controller.abort(), 310_000)
 
     async function fetchAnalysis() {
       try {
@@ -195,7 +227,7 @@ export default function AnalysisPage() {
         }
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') {
-          setError('This is taking longer than expected. Refresh the page to try again.')
+          setError("This is taking longer than expected — usually a busy moment, not a lost case.")
         } else {
           setError("We couldn't reach the server. Please check your connection.")
         }
@@ -210,12 +242,18 @@ export default function AnalysisPage() {
       clearTimeout(timeout)
       controller.abort()
     }
-  }, [caseId])
+  }, [caseId, attempt])
+
+  const retry = () => {
+    setError(null)
+    setLoading(true)
+    setAttempt((a) => a + 1)
+  }
 
   return (
     <main className="min-h-[calc(100vh-8rem)] bg-mist px-6 py-14">
       {loading && <LoadingState />}
-      {!loading && error && <ErrorState message={error} />}
+      {!loading && error && <ErrorState message={error} onRetry={retry} />}
       {!loading && result && <ResultView result={result} caseId={caseId} />}
     </main>
   )
@@ -265,6 +303,37 @@ function ResultView({ result, caseId }: { result: AnalyseResponse; caseId: strin
         </div>
       </div>
 
+      {/* ── What we read from your letter: extraction transparency. If the
+          scan was misread, the user finds out here — before paying, not
+          after. (Pattern borrowed from fighthealthinsurance.com's
+          confirm-extraction step.) ── */}
+      <div className="mt-4 rounded-2xl border border-rule bg-paper px-6 py-4 shadow-lift">
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-slate-faint">
+          What we read from your letter
+        </p>
+        <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 font-sans text-sm text-ink">
+          <span>
+            <span className="text-slate-muted">Insurer:</span>{' '}
+            {result.insurer ?? 'not stated'}
+          </span>
+          <span>
+            <span className="text-slate-muted">Claim:</span>{' '}
+            {result.claimAmount !== null ? formatRupees(result.claimAmount) : 'not stated'}
+          </span>
+          <span>
+            <span className="text-slate-muted">Rejection ground:</span>{' '}
+            {categoryLabel(result.rejectionReasonCategory)}
+          </span>
+        </div>
+        <p className="mt-2 font-sans text-xs leading-relaxed text-slate-faint">
+          If anything here looks wrong, the scan may not have read clearly — upload a sharper copy
+          of the letter and we&apos;ll read it again.
+        </p>
+      </div>
+
+      {/* ── Early lead capture: save the case before the paywall ── */}
+      <SaveCaseCard caseId={caseId} />
+
       {/* ── Match counters ── */}
       {(regulationCount > 0 || precedentCount > 0) && (
         <div className="mt-4 rounded-2xl border border-blue/15 bg-sky-tint/60 px-6 py-4 text-center">
@@ -279,6 +348,34 @@ function ResultView({ result, caseId }: { result: AnalyseResponse; caseId: strin
             )}{' '}
             to your case.
           </p>
+        </div>
+      )}
+
+      {/* ── Why this score: each reason tagged with its source status ── */}
+      {(result.fightabilityReasons ?? []).length > 0 && (
+        <div className="mt-8">
+          <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.18em] text-slate-faint">
+            Why this score · where each point comes from
+          </p>
+          <div className="flex flex-col gap-3">
+            {(result.fightabilityReasons ?? []).slice(0, 3).map((r, i) => (
+              <div key={i} className="rounded-2xl border border-rule bg-paper px-5 py-4 shadow-lift">
+                <p className="font-sans text-sm leading-relaxed text-ink">{r.reason}</p>
+                {r.citation ? (
+                  <p className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-hope/10 px-2 py-1 font-mono text-[10px] tracking-wide text-hope">
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                    Verified — {r.citation}
+                  </p>
+                ) : (
+                  <p className="mt-2 inline-block rounded-md bg-slate-faint/15 px-2 py-1 font-mono text-[10px] tracking-wide text-slate">
+                    General principle — worth confirming with an advisor
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

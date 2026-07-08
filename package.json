@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "tsc --noEmit && tsx scripts/test-generation.ts",
+    "test:golden": "tsx --env-file=.env.local scripts/eval/run-golden.ts",
+    "test:smoke": "tsx --env-file=.env.local scripts/e2e-smoke.ts",
+    "test:smoke:stages": "tsx --env-file=.env.local scripts/e2e-smoke.ts --stages"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",
@@ -15,16 +19,19 @@
     "@upstash/redis": "^1.38.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
+    "adm-zip": "^0.5.16",
     "next": "14.2.35",
     "pdf-lib": "^1.17.1",
     "razorpay": "^2.9.6",
     "react": "^18",
     "react-dom": "^18",
     "resend": "^6.12.3",
+    "sarvamai": "^1.1.7",
     "voyageai": "^0.2.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.8",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",

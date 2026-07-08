@@ -1,16 +1,19 @@
 {
   "functions": {
     "app/api/analyse/route.ts": {
-      "maxDuration": 60
+      "maxDuration": 300
     },
     "app/api/generate/route.ts": {
-      "maxDuration": 60
+      "maxDuration": 180
     },
     "app/api/payment/verify/route.ts": {
       "maxDuration": 60
     },
     "app/api/download/[caseId]/route.ts": {
-      "maxDuration": 120
+      "maxDuration": 300
+    },
+    "app/api/cases/[caseId]/stages/route.ts": {
+      "maxDuration": 300
     },
     "app/api/upload/route.ts": {
       "maxDuration": 30

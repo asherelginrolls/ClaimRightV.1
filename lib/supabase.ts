@@ -38,6 +38,7 @@ export type Database = {
           razorpay_payment_id: string | null
           paid_at: string | null
           user_id: string | null
+          generation_started_at: string | null
         }
         Insert: {
           id?: string
@@ -70,6 +71,7 @@ export type Database = {
           razorpay_payment_id?: string | null
           paid_at?: string | null
           user_id?: string | null
+          generation_started_at?: string | null
         }
         Update: {
           id?: string
@@ -102,6 +104,7 @@ export type Database = {
           razorpay_payment_id?: string | null
           paid_at?: string | null
           user_id?: string | null
+          generation_started_at?: string | null
         }
       }
       case_documents: {

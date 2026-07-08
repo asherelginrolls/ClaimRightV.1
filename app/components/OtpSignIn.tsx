@@ -1,9 +1,9 @@
-﻿'use client'
+'use client'
 
 // Email-OTP sign-in (Supabase Auth). Shared by /auth and the inline step on
 // the pay page. Two steps: send a 6-digit code, then verify it.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@/lib/supabase-browser'
 
 interface OtpSignInProps {
@@ -15,14 +15,44 @@ interface OtpSignInProps {
   compact?: boolean
 }
 
+// Supabase's default per-email resend window is 60s; mirroring it client-side
+// means users see a countdown instead of a raw rate-limit error.
+const RESEND_COOLDOWN_S = 60
+
 export function OtpSignIn({ onSignedIn, initialEmail = '', compact = false }: OtpSignInProps) {
   const [email, setEmail] = useState(initialEmail)
   const [code, setCode] = useState('')
   const [step, setStep] = useState<'email' | 'code'>('email')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [cooldown, setCooldown] = useState(0)
 
   const supabase = createBrowserClient()
+
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const id = setTimeout(() => setCooldown((s) => s - 1), 1000)
+    return () => clearTimeout(id)
+  }, [cooldown])
+
+  // Supabase phrases OTP throttling several ways — the common one is
+  // "For security purposes, you can only request this after N seconds".
+  function isThrottleError(message: string): boolean {
+    const msg = message.toLowerCase()
+    return (
+      msg.includes('rate') ||
+      msg.includes('too many') ||
+      msg.includes('security purposes') ||
+      /after \d+ seconds/.test(msg)
+    )
+  }
+
+  function sendErrorMessage(message: string): string {
+    if (isThrottleError(message)) {
+      return 'We recently sent a code to this email — check your inbox and spam folder. You can request another one in about a minute.'
+    }
+    return "We couldn't send the code. Please check the email address and try again."
+  }
 
   async function sendCode() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -37,13 +67,16 @@ export function OtpSignIn({ onSignedIn, initialEmail = '', compact = false }: Ot
     })
     setBusy(false)
     if (err) {
-      setError(
-        err.message.toLowerCase().includes('rate')
-          ? 'Too many code requests — please wait a minute and try again.'
-          : "We couldn't send the code. Please check the email address and try again."
-      )
+      setError(sendErrorMessage(err.message))
+      // A throttled send means a code is already on its way (or recently
+      // was) — let the user proceed to the code step instead of stranding them.
+      if (isThrottleError(err.message)) {
+        setCooldown(RESEND_COOLDOWN_S)
+        setStep('code')
+      }
       return
     }
+    setCooldown(RESEND_COOLDOWN_S)
     setStep('code')
   }
 
@@ -61,7 +94,12 @@ export function OtpSignIn({ onSignedIn, initialEmail = '', compact = false }: Ot
     })
     setBusy(false)
     if (err) {
-      setError('That code didn’t match. Check the latest email and try again.')
+      const msg = err.message.toLowerCase()
+      setError(
+        msg.includes('expired')
+          ? 'That code has expired. Request a fresh one below — it arrives within a minute.'
+          : 'That code didn’t match. Check the latest email (older codes stop working when a new one is sent).'
+      )
       return
     }
     onSignedIn()
@@ -116,16 +154,31 @@ export function OtpSignIn({ onSignedIn, initialEmail = '', compact = false }: Ot
           <button onClick={verifyCode} disabled={busy} className={buttonCls}>
             {busy ? 'Checking…' : 'Sign in'}
           </button>
-          <button
-            onClick={() => {
-              setStep('email')
-              setCode('')
-              setError(null)
-            }}
-            className="font-sans text-xs text-slate-muted underline-offset-2 hover:underline"
-          >
-            Use a different email
-          </button>
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => {
+                setCode('')
+                void sendCode()
+              }}
+              disabled={busy || cooldown > 0}
+              className="font-sans text-xs text-slate-muted underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:no-underline disabled:opacity-60"
+            >
+              {cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
+            </button>
+            <button
+              onClick={() => {
+                setStep('email')
+                setCode('')
+                setError(null)
+              }}
+              className="font-sans text-xs text-slate-muted underline-offset-2 hover:underline"
+            >
+              Use a different email
+            </button>
+          </div>
+          <p className="font-sans text-xs leading-relaxed text-slate-faint">
+            Codes can take a minute to arrive — check spam if you don&apos;t see it.
+          </p>
         </div>
       )}
 

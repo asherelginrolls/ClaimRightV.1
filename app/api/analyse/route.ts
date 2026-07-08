@@ -479,39 +479,18 @@ export async function GET(
     )
 
     if (!documentText || documentText.trim().length < 50) {
+      // An unreadable scan is NOT a verdict on the case — never render it as a
+      // low fightability score. Return an honest error (the page offers retry
+      // and re-upload); the case stays 'uploaded' and OCR text is cached, so a
+      // retry is cheap.
       console.warn('[analyse] insufficient text len=' + documentText.length)
-      await typedUpdate(supabase, {
-        status: 'analysed',
-        rejection_reason_category: 'other',
-        fightability_score: 'low',
-        fightability_reasons: [
-          {
-            reason:
-              'Could not extract enough text from your document. Please ensure the file is clear and readable.',
-            citation: null,
-          },
-        ],
-      }).eq('id', caseId)
-
-      return NextResponse.json({
-        caseId,
-        insurer: null,
-        claimAmount: null,
-        rejectionReasonCategory: 'other',
-        fightabilityScore: 'low',
-        fightabilityReasons: [
-          {
-            reason:
-              'Could not extract enough text from your document. Please ensure the file is clear and readable.',
-            citation: null,
-          },
-        ],
-        fightabilityNumeric: 5,
-        evidenceSummaries: [],
-        regulationMatchCount: 0,
-        precedentMatchCount: 0,
-        pointByPointAnalysis: [],
-      })
+      return NextResponse.json(
+        {
+          error:
+            "We couldn't read enough of your document to analyse it — this says nothing about how strong your case is. Please upload a clearer photo or the original PDF of the rejection letter.",
+        },
+        { status: 400 }
+      )
     }
 
     // ── 2. Lightweight per-doc structured summaries (sequential, cached) ──
@@ -736,9 +715,17 @@ export async function GET(
       point_by_point_analysis: pointByPointAnalysis,
     }
 
-    console.info('[analyse] stage: db-write-start')
-    await typedUpdate(supabase, updatePayload).eq('id', caseId)
-    console.info('[analyse] stage: db-write-end')
+    if (reasoning.groundingFailed) {
+      // Retrieval infra errored (embed rate limit / DB outage): the angles have
+      // EMPTY groundings, so this result has no citations — a degraded verdict.
+      // Serve it for this request but do NOT cache it as final: the case stays
+      // 'uploaded' and the next refresh re-runs with working retrieval.
+      console.warn('[analyse] grounding failed — serving uncached degraded result')
+    } else {
+      console.info('[analyse] stage: db-write-start')
+      await typedUpdate(supabase, updatePayload).eq('id', caseId)
+      console.info('[analyse] stage: db-write-end')
+    }
 
     const regulationMatchCount = evidenceSummaries.filter((e) => e.tier === 1).length
     const precedentMatchCount = evidenceSummaries.filter((e) => e.tier === 2).length

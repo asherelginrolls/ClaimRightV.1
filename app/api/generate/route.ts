@@ -4,6 +4,9 @@ import { generateDisputeLetter } from '@/lib/generation'
 import type { ApiError } from '@/types/api'
 import { rateLimit } from '@/lib/rate-limit'
 
+// Letter pipeline: strategize ≤60s + grounding ≤25s + letter Sonnet ≤120s.
+export const maxDuration = 180
+
 type CaseRow = Database['public']['Tables']['cases']['Row']
 type CaseUpdate = Database['public']['Tables']['cases']['Update']
 

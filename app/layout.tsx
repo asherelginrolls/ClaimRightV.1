@@ -4,6 +4,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { redaction, redactionDecay, plexSans, plexMono } from "./typography";
 import { Wordmark } from "./components/Wordmark";
+import { HeaderNav } from "./components/HeaderNav";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -27,12 +28,7 @@ export default function RootLayout({
           <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
             <Wordmark />
             <div className="flex items-center gap-4">
-              <Link
-                href="/vault"
-                className="font-sans text-sm font-medium text-slate transition-colors hover:text-ink"
-              >
-                My cases
-              </Link>
+              <HeaderNav />
               <Link
                 href="/upload"
                 className="rounded-full border border-rule-strong bg-paper px-4 py-2 font-sans text-sm font-semibold text-blue-deep shadow-sm transition-colors hover:border-blue/40 hover:text-blue"

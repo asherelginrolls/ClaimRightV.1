@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import type { AnalyseResponse } from '@/types/api'
+import { SaveCaseCard } from '@/app/components/SaveCaseCard'
 
 function formatRupees(amount: number): string {
   return `₹${amount.toLocaleString('en-IN')}`
@@ -284,6 +285,9 @@ function ResultView({ result, caseId }: { result: AnalyseResponse; caseId: strin
           </div>
         </div>
       </div>
+
+      {/* ── Early lead capture: save the case before the paywall ── */}
+      <SaveCaseCard caseId={caseId} />
 
       {/* ── Match counters ── */}
       {(regulationCount > 0 || precedentCount > 0) && (

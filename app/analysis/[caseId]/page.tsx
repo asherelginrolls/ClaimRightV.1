@@ -10,6 +10,22 @@ function formatRupees(amount: number): string {
   return `₹${amount.toLocaleString('en-IN')}`
 }
 
+// Plain-English labels for the 9 canonical rejection categories.
+function categoryLabel(category: string | null): string {
+  switch (category) {
+    case 'pre_existing_condition': return 'Pre-existing condition'
+    case 'policy_exclusion': return 'Policy exclusion'
+    case 'documentation_incomplete': return 'Incomplete documentation'
+    case 'non_disclosure': return 'Non-disclosure'
+    case 'waiting_period': return 'Waiting period'
+    case 'cashless_denial': return 'Cashless denial'
+    case 'experimental_treatment': return 'Experimental treatment'
+    case 'fraud_suspected': return 'Fraud allegation'
+    case 'other': return 'Other / unclear'
+    default: return 'Not identified'
+  }
+}
+
 // ── Hopeful score bands ──────────────────────────────────────────────────────
 // Mapped off the 0–100 number the backend already returns. Tuned for hope:
 // even a weak case reads as "here's your path", never a red alarm.
@@ -285,6 +301,34 @@ function ResultView({ result, caseId }: { result: AnalyseResponse; caseId: strin
             )}
           </div>
         </div>
+      </div>
+
+      {/* ── What we read from your letter: extraction transparency. If the
+          scan was misread, the user finds out here — before paying, not
+          after. (Pattern borrowed from fighthealthinsurance.com's
+          confirm-extraction step.) ── */}
+      <div className="mt-4 rounded-2xl border border-rule bg-paper px-6 py-4 shadow-lift">
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-slate-faint">
+          What we read from your letter
+        </p>
+        <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 font-sans text-sm text-ink">
+          <span>
+            <span className="text-slate-muted">Insurer:</span>{' '}
+            {result.insurer ?? 'not stated'}
+          </span>
+          <span>
+            <span className="text-slate-muted">Claim:</span>{' '}
+            {result.claimAmount !== null ? formatRupees(result.claimAmount) : 'not stated'}
+          </span>
+          <span>
+            <span className="text-slate-muted">Rejection ground:</span>{' '}
+            {categoryLabel(result.rejectionReasonCategory)}
+          </span>
+        </div>
+        <p className="mt-2 font-sans text-xs leading-relaxed text-slate-faint">
+          If anything here looks wrong, the scan may not have read clearly — upload a sharper copy
+          of the letter and we&apos;ll read it again.
+        </p>
       </div>
 
       {/* ── Early lead capture: save the case before the paywall ── */}

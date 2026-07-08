@@ -17,7 +17,7 @@ verification in Phase 6.
 - [x] F3. Upload validates magic bytes, stores under UUID paths, sets session cookie, creates case + case_documents rows — evidence: live upload of test PDF → caseId + cr_sid cookie set + rows created
 - [x] F4. /api/analyse fast path returns extraction + retrieval + score + evidence cards — evidence: live GET /api/analyse → score=strong/85, insurer="Star Health…", 3 reasons with real [Source:] citations
 - [ ] F5. Analysis page shows numeric score dial + evidence cards + locked preview + ₹299 CTA — data verified; visual render pending real-browser check
-- [ ] F6. Refresh of analysis page never re-runs AI (cached on row) — not re-tested this pass
+- [x] F6. Refresh of analysis page never re-runs AI (cached on row) — evidence: smoke 2026-07-08, cached refresh 0.3–0.8s after 54–83s first run; grounding-failure results deliberately NOT cached (degraded verdicts re-run instead)
 - [x] F7. Razorpay test-mode payment completes; verify uses timingSafeEqual; idempotent — evidence: live /api/payment created order_… (₹299/29900p), /api/payment/verify accepted valid HMAC sig, marked paid
 - [x] F8. Post-payment letter ≥400 words, ≥3 real inline citations, fixed template — evidence: live GRO letter delivered (valid 5KB PDF); Bima Bharosa complaint = 773 words, 5 [Source:] citations, no inversion
 - [x] F9. Download serves PDF; letter also emailed via Resend — evidence: /api/download → status=delivered (generateAndDeliver ran; GRO stage + artifact created)
@@ -31,7 +31,7 @@ verification in Phase 6.
 - [x] R4. Golden bursitis case: produces the two correct angles (Excl.02 misapplied; 91-day delay violation); never the inverted 9-vs-24 argument — evidence: bursitis-star-health PASS (both angles ✓, judge PASS)
 - [x] R5. Fabricated-citation test: a citation referencing a chunk_id not in the retrieved set is caught and removed — evidence: 3 hallucination-isolation checks in test-generation.ts all ✓
 - [x] R6. Golden eval suite passes with no regression vs raw-Sonnet baseline — evidence: pipeline 5/5 = baseline 5/5, plus real citations baseline lacks
-- [ ] R7. Analysis fast path latency measured and within budget
+- [x] R7. Analysis fast path latency measured and within budget — evidence: smoke 2026-07-08, analyse 54.3s / 83.1s (budget 300s); letter generation 75.9–255.8s (budget 300s)
 
 ## Knowledge base (Phases 1–2)
 - [x] K1. Synthetic ombudsman precedents purged from live kb_chunks and quarantined from source files — evidence: purge ran (3 chunks deleted), KB now 78 chunks, files in quarantine/
@@ -79,5 +79,6 @@ verification in Phase 6.
 - [x] P8. Client stuck-states removed: analysis page in-place retry (was: link to /upload, discarding the case); download page honest 2-min copy + taking-long state + ~7-min stall detection with retry
 - [x] P9. "Why this score" section tags each reason Verified (with source) vs general principle — surfacing the grounding the pipeline already computes
 - [x] P10. E2E smoke suite (scripts/e2e-smoke.ts) with per-step wall-clock timings + npm test chain — evidence: run on 2026-07-08 correctly caught the Anthropic-credit outage (score 5, no citation, no letter)
-- [ ] P11. Full live smoke green end-to-end — BLOCKED on Anthropic API credits (top up, then `npm run test:smoke`)
+- [x] P11. Full live smoke green end-to-end — evidence 2026-07-08 (local dev, live Supabase/Anthropic/Voyage/Sarvam): `test:smoke` PASS (upload 4s → analyse 83s strong/85 w/ real citations → cached 0.8s → paid → 8KB letter PDF → GRO stage); `test:smoke:stages` PASS (advance → BB complaint + walkthrough, 142s); `test:golden` 5/5; note: same-PDF score varied strong/85 vs medium/55 across runs (extraction variance — golden eval with fixed facts stays 5/5)
+- [x] P13. Code-review round (2026-07-08): 5 findings fixed — analyse retry race (client 310s), pre-014 stuck recovery (?stuck=1), OTP throttle wording, recursive smoke storage cleanup, stall-error vs letter ordering. Plus: extraction-transparency strip, honest unreadable-document 400, groundingFailed never cached. PRs #16/#17 closed with triage reasons.
 - [x] P12. Phase-6 test data removed (case ad556e34… already absent; auth user phase6-vault@ashray.test deleted; stale smoke case cleaned)

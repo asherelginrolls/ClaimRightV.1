@@ -35,9 +35,20 @@ export function OtpSignIn({ onSignedIn, initialEmail = '', compact = false }: Ot
     return () => clearTimeout(id)
   }, [cooldown])
 
-  function sendErrorMessage(message: string): string {
+  // Supabase phrases OTP throttling several ways — the common one is
+  // "For security purposes, you can only request this after N seconds".
+  function isThrottleError(message: string): boolean {
     const msg = message.toLowerCase()
-    if (msg.includes('rate') || msg.includes('too many')) {
+    return (
+      msg.includes('rate') ||
+      msg.includes('too many') ||
+      msg.includes('security purposes') ||
+      /after \d+ seconds/.test(msg)
+    )
+  }
+
+  function sendErrorMessage(message: string): string {
+    if (isThrottleError(message)) {
       return 'We recently sent a code to this email — check your inbox and spam folder. You can request another one in about a minute.'
     }
     return "We couldn't send the code. Please check the email address and try again."
@@ -57,9 +68,9 @@ export function OtpSignIn({ onSignedIn, initialEmail = '', compact = false }: Ot
     setBusy(false)
     if (err) {
       setError(sendErrorMessage(err.message))
-      // A rate-limited send means a code is already on its way (or recently
+      // A throttled send means a code is already on its way (or recently
       // was) — let the user proceed to the code step instead of stranding them.
-      if (err.message.toLowerCase().includes('rate')) {
+      if (isThrottleError(err.message)) {
         setCooldown(RESEND_COOLDOWN_S)
         setStep('code')
       }

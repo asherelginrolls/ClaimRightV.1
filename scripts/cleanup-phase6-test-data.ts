@@ -7,6 +7,7 @@
 // Usage: npx tsx --env-file=.env.local scripts/cleanup-phase6-test-data.ts
 
 import { createClient } from '@supabase/supabase-js'
+import { removeStorageFolder } from './lib/storage-cleanup'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -21,34 +22,6 @@ const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
 const PHASE6_CASE_PREFIX = 'ad556e34'
 const PHASE6_EMAIL = 'phase6-vault@ashray.test'
 
-async function removeStorageFolder(prefix: string): Promise<void> {
-  // Storage has no recursive delete; walk one level of known subpaths.
-  const paths: string[] = []
-  const { data: top } = await supabase.storage.from('documents').list(prefix)
-  for (const item of top ?? []) {
-    if (item.id === null) {
-      // folder (e.g. stages/)
-      const { data: sub } = await supabase.storage.from('documents').list(`${prefix}/${item.name}`)
-      for (const subItem of sub ?? []) {
-        if (subItem.id === null) {
-          const { data: leaf } = await supabase.storage
-            .from('documents')
-            .list(`${prefix}/${item.name}/${subItem.name}`)
-          for (const l of leaf ?? []) paths.push(`${prefix}/${item.name}/${subItem.name}/${l.name}`)
-        } else {
-          paths.push(`${prefix}/${item.name}/${subItem.name}`)
-        }
-      }
-    } else {
-      paths.push(`${prefix}/${item.name}`)
-    }
-  }
-  if (paths.length > 0) {
-    await supabase.storage.from('documents').remove(paths)
-    console.log(`  storage: removed ${paths.length} object(s) under ${prefix}/`)
-  }
-}
-
 async function deleteCase(caseId: string): Promise<void> {
   const { data: stageRows } = await supabase.from('dispute_stages').select('id').eq('case_id', caseId)
   const stageIds = ((stageRows ?? []) as Array<{ id: string }>).map((s) => s.id)
@@ -58,8 +31,8 @@ async function deleteCase(caseId: string): Promise<void> {
   }
   await supabase.from('case_documents').delete().eq('case_id', caseId)
   await supabase.from('cases').delete().eq('id', caseId)
-  await removeStorageFolder(caseId)
-  console.log(`  deleted case ${caseId} (stages: ${stageIds.length})`)
+  const removed = await removeStorageFolder(supabase, caseId)
+  console.log(`  deleted case ${caseId} (stages: ${stageIds.length}, storage: ${removed})`)
 }
 
 async function main(): Promise<void> {

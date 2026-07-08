@@ -195,9 +195,10 @@ export default function AnalysisPage() {
 
   useEffect(() => {
     const controller = new AbortController()
-    // The server budget is 300s; already-analysed cases return instantly from
-    // cache, so a long first-run wait is the only case this timeout guards.
-    const timeout = setTimeout(() => controller.abort(), 180_000)
+    // Abort only AFTER the server's 300s budget: aborting earlier lets the
+    // user hit Retry while the first run is still alive server-side, which
+    // would start a second full (paid) reasoning pipeline in parallel.
+    const timeout = setTimeout(() => controller.abort(), 310_000)
 
     async function fetchAnalysis() {
       try {

@@ -199,9 +199,20 @@ export async function GET(
       await typedUpdate(supabase, { status: 'generated' }).eq('id', caseId)
       return signedUrlResponse(supabase, { id: caseRow.id, status: 'generated' }, caseRow.letter_path)
     }
-    if (!isStale || !('generation_started_at' in caseRow)) {
-      // Either an active run, or (pre-migration-014) we can't tell — wait.
+    // Pre-migration-014 the timestamp column doesn't exist, so we can't tell a
+    // dead claim from a live one. The page's ?stuck=1 retry (sent only after
+    // ~7 min of polling — past any possible live 300s function) is the
+    // fallback signal; access is already ownership-checked above.
+    const columnMissing = !('generation_started_at' in caseRow)
+    const clientAttestsStuck = request.nextUrl.searchParams.get('stuck') === '1'
+    if (columnMissing ? !clientAttestsStuck : !isStale) {
+      // An active run (or pre-014 with no stuck signal) — wait.
       return NextResponse.json({ pending: true, status: 'generating' })
+    }
+    if (columnMissing) {
+      console.error(
+        '[download] migration 014 not applied — recovering stuck case via client signal caseId=' + caseId
+      )
     }
     console.warn('[download] stale generating claim reset caseId=' + caseId)
     await releaseGeneration(supabase, caseId)

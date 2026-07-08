@@ -21,6 +21,7 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { createClient } from '@supabase/supabase-js'
+import { removeStorageFolder } from './lib/storage-cleanup'
 
 const BASE_URL = process.env.SMOKE_BASE_URL ?? 'http://localhost:3000'
 const FIXTURE = join(process.cwd(), 'scripts', 'test-docs', 'test-rejection-letter.pdf.pdf')
@@ -209,13 +210,9 @@ async function main(): Promise<void> {
     }
     await supabase.from('case_documents').delete().eq('case_id', caseId)
     await supabase.from('cases').delete().eq('id', caseId)
-    const { data: objects } = await supabase.storage.from('documents').list(caseId)
-    if (objects && objects.length > 0) {
-      await supabase.storage
-        .from('documents')
-        .remove(objects.map((o) => `${caseId}/${o.name}`))
-    }
-    console.log('\ncleanup: smoke case removed')
+    // Recursive: --stages runs leave nested stages/{stage}/ artifacts too.
+    const removed = await removeStorageFolder(supabase, caseId)
+    console.log(`\ncleanup: smoke case removed (${removed} storage object(s))`)
   } else {
     console.log(`\ncleanup skipped (--keep): caseId=${caseId}`)
   }

@@ -67,6 +67,10 @@ export default function DownloadPage() {
   const [needsSignIn, setNeedsSignIn] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pollCountRef = useRef(0)
+  // Set when we stalled out (~7 min of polling). The next retry's first poll
+  // sends ?stuck=1 so the server can reset a dead 'generating' claim even
+  // before migration 014's timestamp exists.
+  const stalledRef = useRef(false)
 
   // Polls every 3s. After ~2.5 min switch to "taking longer" copy; after
   // ~7 min (well past the server's 5-min stale-claim auto-retry) stop and
@@ -83,6 +87,7 @@ export default function DownloadPage() {
       pollCountRef.current += 1
       if (pollCountRef.current === LONG_AFTER_POLLS) setTakingLong(true)
       if (pollCountRef.current >= STALLED_AFTER_POLLS) {
+        stalledRef.current = true
         setError(
           "Generation is taking far longer than it should. Your payment and case are safe — retry below, and the letter will pick up where it left off."
         )
@@ -90,7 +95,9 @@ export default function DownloadPage() {
         return
       }
       try {
-        const res = await fetch(`/api/download/${caseId}`)
+        const stuck = stalledRef.current && pollCountRef.current === 1
+        if (stuck) stalledRef.current = false
+        const res = await fetch(`/api/download/${caseId}${stuck ? '?stuck=1' : ''}`)
         if (!res.ok) {
           const d = (await res.json()) as { error?: string; code?: string }
           if (res.status === 403 && d.code === 'sign_in_required') {
@@ -147,7 +154,9 @@ export default function DownloadPage() {
     )
   }
 
-  if (error) {
+  // signedUrl wins over error: a long in-flight generation fetch can resolve
+  // with the letter after the stall error was set — show the letter.
+  if (error && !signedUrl) {
     return (
       <main className="min-h-[calc(100vh-8rem)] bg-mist px-6 py-14">
         <div className="mx-auto max-w-md py-10 text-center">
